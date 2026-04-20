@@ -82,9 +82,14 @@ The pipeline intentionally starts with Yellow and Green only. `FHV` and
   - `data/bronze/green_taxi/year=YYYY/month=MM/`
   - `data/reference/taxi_zone_lookup/taxi_zone_lookup.csv`
 
+## Current Transform Execution
+
+- Airflow now runs `dbt build` for Bronze and Silver after ingestion completes
+- Gold marts are built in a separate downstream task
+- DuckDB warehouse files are persisted under `warehouse/`
+
 ## Next Steps
 
-- Materialize Bronze parquet objects into DuckDB-accessible paths
-- Join Taxi Zone Lookup into Silver and Gold marts where location names are needed
+- Join Taxi Zone Lookup into more Silver and Gold marts where location names are needed
 - Add SQL validation and LLM integration in `services/api/app`
 - Add integration tests once the first runnable pipeline is in place

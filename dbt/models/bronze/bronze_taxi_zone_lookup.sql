@@ -4,6 +4,6 @@ select
     cast(Zone as varchar) as zone_name,
     cast(service_zone as varchar) as service_zone
 from read_csv_auto(
-    '{{ var("taxi_zone_lookup_path", "../data/reference/taxi_zone_lookup/taxi_zone_lookup.csv") }}',
+    '{{ var("taxi_zone_lookup_path", env_var("LOCAL_DATA_ROOT", "../data") ~ "/reference/taxi_zone_lookup/taxi_zone_lookup.csv") }}',
     header = true
 )

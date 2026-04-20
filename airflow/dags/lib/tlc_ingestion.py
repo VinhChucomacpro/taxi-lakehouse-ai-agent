@@ -7,7 +7,6 @@ from shutil import copyfileobj
 from urllib.request import Request, urlopen
 
 TLC_CLOUDFRONT_BASE_URL = "https://d37ci6vzurychx.cloudfront.net"
-TLC_REFERENCE_BASE_URL = "https://s3.amazonaws.com/nyc-tlc"
 TRIP_DATASETS = {
     "yellow": "yellow_taxi",
     "green": "green_taxi",
@@ -52,7 +51,7 @@ def build_tripdata_url(dataset: str, year: int, month: int) -> str:
 
 
 def build_lookup_url() -> str:
-    return f"{TLC_REFERENCE_BASE_URL}/misc/taxi+_zone_lookup.csv"
+    return f"{TLC_CLOUDFRONT_BASE_URL}/misc/taxi_zone_lookup.csv"
 
 
 def build_trip_manifest(dataset: str, run_date: datetime) -> TripDataManifest:

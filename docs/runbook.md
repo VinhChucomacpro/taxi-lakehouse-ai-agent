@@ -19,5 +19,6 @@
 
 - Bronze ingestion currently starts with Yellow and Green monthly files.
 - Taxi Zone Lookup is ingested separately as reference data for enrichment.
+- Airflow runs `dbt build` inside the scheduler/webserver image using `dbt-duckdb`.
 - The next stable milestone is a runnable `Bronze -> Silver -> Gold` path on real TLC data.
 - The AI API is scaffolded and not yet a full production query service.

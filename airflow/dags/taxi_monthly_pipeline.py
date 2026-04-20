@@ -7,10 +7,20 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.operators.empty import EmptyOperator
 
+from lib.dbt_runner import run_dbt_build
 from lib.tlc_ingestion import build_lookup_manifest, build_trip_manifest, download_file_to_local
 
 LOCAL_DATA_ROOT = os.getenv("LOCAL_DATA_ROOT", "/opt/airflow/data")
 TLC_DOWNLOAD_TIMEOUT_SECONDS = int(os.getenv("TLC_DOWNLOAD_TIMEOUT_SECONDS", "300"))
+
+
+def resolve_run_date(data_interval_start, dag_run=None) -> datetime:
+    if dag_run and dag_run.conf:
+        year = dag_run.conf.get("year")
+        month = dag_run.conf.get("month")
+        if year and month:
+            return datetime(int(year), int(month), 1)
+    return data_interval_start
 
 
 with DAG(
@@ -24,12 +34,14 @@ with DAG(
     start = EmptyOperator(task_id="start")
 
     @task
-    def prepare_yellow_manifest(data_interval_start=None) -> dict[str, str]:
-        return build_trip_manifest("yellow", data_interval_start).to_dict()
+    def prepare_yellow_manifest(data_interval_start=None, dag_run=None) -> dict[str, str]:
+        run_date = resolve_run_date(data_interval_start, dag_run)
+        return build_trip_manifest("yellow", run_date).to_dict()
 
     @task
-    def prepare_green_manifest(data_interval_start=None) -> dict[str, str]:
-        return build_trip_manifest("green", data_interval_start).to_dict()
+    def prepare_green_manifest(data_interval_start=None, dag_run=None) -> dict[str, str]:
+        run_date = resolve_run_date(data_interval_start, dag_run)
+        return build_trip_manifest("green", run_date).to_dict()
 
     @task
     def prepare_lookup_reference() -> dict[str, str]:
@@ -43,8 +55,14 @@ with DAG(
             timeout_seconds=TLC_DOWNLOAD_TIMEOUT_SECONDS,
         )
 
-    build_silver = EmptyOperator(task_id="build_silver")
-    build_gold = EmptyOperator(task_id="build_gold")
+    @task
+    def build_silver_layer() -> None:
+        run_dbt_build("path:models/bronze path:models/silver")
+
+    @task
+    def build_gold_layer() -> None:
+        run_dbt_build("path:models/gold")
+
     publish_metadata = EmptyOperator(task_id="publish_metadata")
     done = EmptyOperator(task_id="done")
 
@@ -54,6 +72,8 @@ with DAG(
     yellow_bronze = ingest_to_local.override(task_id="ingest_yellow_bronze")(yellow_manifest)
     green_bronze = ingest_to_local.override(task_id="ingest_green_bronze")(green_manifest)
     lookup_reference = ingest_to_local.override(task_id="ingest_taxi_zone_lookup")(lookup_manifest)
+    build_silver = build_silver_layer()
+    build_gold = build_gold_layer()
 
     start >> [yellow_manifest, green_manifest, lookup_manifest]
     yellow_manifest >> yellow_bronze

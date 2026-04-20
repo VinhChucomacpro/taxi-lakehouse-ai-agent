@@ -38,5 +38,5 @@ def test_build_lookup_manifest() -> None:
     manifest = module.build_lookup_manifest().to_dict()
 
     assert manifest["dataset"] == "taxi_zone_lookup"
-    assert manifest["source_url"].endswith("/misc/taxi+_zone_lookup.csv")
+    assert manifest["source_url"].endswith("/misc/taxi_zone_lookup.csv")
     assert manifest["local_relative_path"] == "reference/taxi_zone_lookup/taxi_zone_lookup.csv"

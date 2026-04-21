@@ -61,7 +61,8 @@ Recommended demo flow:
 2. Open `Schema` to show the curated Gold objects available to the agent.
 3. Use `SQL Test` with the default query to show deterministic DuckDB results.
 4. Use `Guardrails` to show that Silver access is blocked.
-5. Use `Ask AI` to generate SQL from a natural-language question when `OPENAI_API_KEY` is configured.
+5. Use the auto chart selector and agent checks to show result diagnostics.
+6. Use `Ask AI` to generate SQL from a natural-language question when `OPENAI_API_KEY` is configured.
 
 ## MinIO Checks
 
@@ -73,3 +74,34 @@ After a successful ingestion run, bucket `taxi-lakehouse` should contain:
 - `bronze/yellow_taxi/year=YYYY/month=MM/yellow_tripdata_YYYY-MM.parquet`
 - `bronze/green_taxi/year=YYYY/month=MM/green_tripdata_YYYY-MM.parquet`
 - `reference/taxi_zone_lookup/taxi_zone_lookup.csv`
+
+## Airflow End-to-End Check
+
+Start Airflow:
+
+```bash
+docker compose up -d --build airflow-webserver airflow-scheduler
+```
+
+Open `http://localhost:8080` and trigger `taxi_monthly_pipeline` with config:
+
+```json
+{
+  "year": 2024,
+  "month": 1
+}
+```
+
+For CLI testing from the scheduler container, trigger with a Python dict to avoid
+shell-specific JSON escaping issues:
+
+```bash
+docker compose exec airflow-scheduler python -c "from airflow.api.common.trigger_dag import trigger_dag; trigger_dag(dag_id='taxi_monthly_pipeline', run_id='e2e_2024_01', conf={'year': 2024, 'month': 1})"
+```
+
+Expected results:
+
+- all DAG tasks end in `success`
+- MinIO receives Yellow, Green, and Taxi Zone Lookup objects
+- `dbt build` completes Bronze, Silver, and Gold models
+- Silver only keeps trips whose pickup timestamp falls inside the source file partition month

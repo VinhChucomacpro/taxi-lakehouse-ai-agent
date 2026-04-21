@@ -13,6 +13,8 @@ DEFAULT_SQL = """select service_type, pickup_date, trip_count
 from gold_daily_kpis
 order by pickup_date, service_type"""
 GUARDRAIL_SQL = "select * from silver_trips_unified"
+DATE_HINTS = ("date", "day", "month", "year", "_at")
+METRIC_HINTS = ("count", "amount", "fare", "distance", "avg", "total", "sum")
 
 
 st.set_page_config(
@@ -45,6 +47,129 @@ def post_query(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | No
         return None, str(exc), None
 
 
+def prepare_dataframe(rows: list[dict[str, Any]], columns: list[str]) -> pd.DataFrame:
+    dataframe = pd.DataFrame(rows, columns=columns)
+    for column in dataframe.columns:
+        lower_name = column.lower()
+        if any(hint in lower_name for hint in DATE_HINTS):
+            converted = pd.to_datetime(dataframe[column], errors="coerce")
+            if converted.notna().any():
+                dataframe[column] = converted
+        else:
+            numeric = pd.to_numeric(dataframe[column], errors="coerce")
+            if numeric.notna().sum() == dataframe[column].notna().sum():
+                dataframe[column] = numeric
+    return dataframe
+
+
+def find_datetime_columns(dataframe: pd.DataFrame) -> list[str]:
+    return [
+        column
+        for column in dataframe.columns
+        if pd.api.types.is_datetime64_any_dtype(dataframe[column])
+    ]
+
+
+def find_numeric_columns(dataframe: pd.DataFrame) -> list[str]:
+    return [
+        column
+        for column in dataframe.columns
+        if pd.api.types.is_numeric_dtype(dataframe[column])
+    ]
+
+
+def find_category_columns(dataframe: pd.DataFrame) -> list[str]:
+    return [
+        column
+        for column in dataframe.columns
+        if column not in find_numeric_columns(dataframe)
+        and column not in find_datetime_columns(dataframe)
+    ]
+
+
+def preferred_metric(numeric_columns: list[str]) -> str | None:
+    for hint in METRIC_HINTS:
+        for column in numeric_columns:
+            if hint in column.lower():
+                return column
+    return numeric_columns[0] if numeric_columns else None
+
+
+def result_warnings(dataframe: pd.DataFrame, max_rows: int) -> list[str]:
+    warnings: list[str] = []
+    if dataframe.empty:
+        return ["The query returned no rows."]
+
+    if len(dataframe) >= max_rows:
+        warnings.append("The result reached the max row limit; increase max rows for more detail.")
+
+    for column in find_numeric_columns(dataframe):
+        if (dataframe[column] < 0).any():
+            warnings.append(f"`{column}` contains negative values.")
+
+    for column in find_datetime_columns(dataframe):
+        min_date = dataframe[column].min()
+        max_date = dataframe[column].max()
+        if pd.notna(min_date) and pd.notna(max_date):
+            if min_date.year < 2010 or max_date.year > 2030:
+                warnings.append(
+                    f"`{column}` has an unusual date range: {min_date.date()} to {max_date.date()}."
+                )
+
+    return warnings
+
+
+def render_auto_chart(dataframe: pd.DataFrame, max_rows: int) -> None:
+    datetime_columns = find_datetime_columns(dataframe)
+    numeric_columns = find_numeric_columns(dataframe)
+    category_columns = find_category_columns(dataframe)
+    metric = preferred_metric(numeric_columns)
+
+    warnings = result_warnings(dataframe, max_rows)
+    if warnings:
+        with st.expander("Agent checks", expanded=True):
+            for warning in warnings:
+                st.warning(warning)
+
+    if dataframe.empty or not metric:
+        return
+
+    chart_type_options = ["Auto", "Line", "Bar", "Table only"]
+    chart_type = st.selectbox("Chart", chart_type_options, index=0)
+    selected_type = chart_type
+    if chart_type == "Auto":
+        selected_type = "Line" if datetime_columns else "Bar"
+
+    if selected_type == "Line" and datetime_columns:
+        x_column = st.selectbox("X axis", datetime_columns, key="line_x")
+        y_column = st.selectbox("Y axis", numeric_columns, index=numeric_columns.index(metric), key="line_y")
+        chart_frame = dataframe.sort_values(x_column)
+        if category_columns:
+            color_column = st.selectbox("Series", ["None", *category_columns], key="line_series")
+            if color_column != "None":
+                pivoted = chart_frame.pivot_table(
+                    index=x_column,
+                    columns=color_column,
+                    values=y_column,
+                    aggfunc="sum",
+                )
+                st.line_chart(pivoted, use_container_width=True)
+                return
+        st.line_chart(chart_frame.set_index(x_column)[[y_column]], use_container_width=True)
+        return
+
+    if selected_type == "Bar" and category_columns:
+        category_column = st.selectbox("Category", category_columns, key="bar_category")
+        y_column = st.selectbox("Metric", numeric_columns, index=numeric_columns.index(metric), key="bar_y")
+        chart_frame = (
+            dataframe.groupby(category_column, dropna=False)[y_column]
+            .sum()
+            .sort_values(ascending=False)
+            .head(20)
+        )
+        st.bar_chart(chart_frame, use_container_width=True)
+
+
 def render_result(result: dict[str, Any]) -> None:
     st.caption(result.get("summary", ""))
     st.code(result.get("sql", ""), language="sql")
@@ -52,7 +177,9 @@ def render_result(result: dict[str, Any]) -> None:
     rows = result.get("rows", [])
     columns = result.get("columns", [])
     if rows:
-        st.dataframe(pd.DataFrame(rows, columns=columns), use_container_width=True)
+        dataframe = prepare_dataframe(rows, columns)
+        render_auto_chart(dataframe, max_rows)
+        st.dataframe(dataframe, use_container_width=True)
     else:
         st.info("Query completed with no rows.")
 

@@ -23,6 +23,8 @@ Expected local paths:
 Unified trip rows should include at least:
 
 - `service_type`
+- `source_year`
+- `source_month`
 - `pickup_date`
 - `pickup_at`
 - `dropoff_at`
@@ -35,6 +37,8 @@ Unified trip rows should include at least:
 Silver should normalize Yellow and Green into the same semantic shape.
 Taxi Zone Lookup may be joined as reference data, but it does not change the
 fact-source scope of the project.
+Silver filters out records whose pickup timestamp falls outside the source file
+partition month.
 
 ## Gold Contract
 

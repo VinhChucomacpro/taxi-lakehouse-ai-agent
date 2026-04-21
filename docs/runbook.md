@@ -8,6 +8,7 @@
    - Airflow at `http://localhost:8080`
    - MinIO Console at `http://localhost:9001`
    - API docs at `http://localhost:8000/docs`
+   - Streamlit demo at `http://localhost:8501`
 
 ## Expected Local Volumes
 
@@ -41,3 +42,21 @@ Example request body:
   "sql": "select service_type, pickup_date, trip_count from gold_daily_kpis order by pickup_date, service_type"
 }
 ```
+
+## Streamlit Demo
+
+Start the API and demo UI:
+
+```bash
+docker compose up --build api demo
+```
+
+Open `http://localhost:8501`.
+
+Recommended demo flow:
+
+1. Check the sidebar health status and Gold table count.
+2. Open `Schema` to show the curated Gold objects available to the agent.
+3. Use `SQL Test` with the default query to show deterministic DuckDB results.
+4. Use `Guardrails` to show that Silver access is blocked.
+5. Use `Ask AI` to generate SQL from a natural-language question when `OPENAI_API_KEY` is configured.

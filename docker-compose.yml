@@ -112,3 +112,14 @@ services:
       - ./warehouse:/data/warehouse
     depends_on:
       - minio
+
+  demo:
+    build:
+      context: .
+      dockerfile: services/demo/Dockerfile
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api

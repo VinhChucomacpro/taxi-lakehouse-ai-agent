@@ -54,7 +54,7 @@ def validate_gold_select(sql: str, catalog: SchemaResponse, max_rows: int) -> Va
 def _apply_limit(expression: exp.Select, max_rows: int) -> None:
     limit_expression = expression.args.get("limit")
     if limit_expression is None:
-        expression.limit(max_rows)
+        expression.limit(max_rows, copy=False)
         return
 
     current_limit = limit_expression.expression

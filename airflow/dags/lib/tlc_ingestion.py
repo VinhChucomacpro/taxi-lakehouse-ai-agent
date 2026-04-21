@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ TRIP_DATASETS = {
     "green": "green_taxi",
 }
 DEFAULT_TIMEOUT_SECONDS = 300
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -99,6 +101,12 @@ def download_file_to_local(
 ) -> dict[str, str]:
     destination_path = resolve_local_path(local_data_root, manifest["local_relative_path"])
     destination_path.parent.mkdir(parents=True, exist_ok=True)
+    LOGGER.info(
+        "Downloading dataset=%s from %s to %s",
+        manifest["dataset"],
+        manifest["source_url"],
+        destination_path,
+    )
 
     request = Request(
         manifest["source_url"],
@@ -109,9 +117,18 @@ def download_file_to_local(
         with destination_path.open("wb") as destination_file:
             copyfileobj(response, destination_file)
 
+    file_size_bytes = destination_path.stat().st_size
+    LOGGER.info(
+        "Downloaded dataset=%s to %s (%s bytes)",
+        manifest["dataset"],
+        destination_path,
+        file_size_bytes,
+    )
+
     return {
         **manifest,
         "local_path": str(destination_path),
+        "file_size_bytes": str(file_size_bytes),
     }
 
 

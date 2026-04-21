@@ -20,5 +20,24 @@
 - Bronze ingestion currently starts with Yellow and Green monthly files.
 - Taxi Zone Lookup is ingested separately as reference data for enrichment.
 - Airflow runs `dbt build` inside the scheduler/webserver image using `dbt-duckdb`.
-- The next stable milestone is a runnable `Bronze -> Silver -> Gold` path on real TLC data.
-- The AI API is scaffolded and not yet a full production query service.
+- The local `Bronze -> Silver -> Gold` path can be validated with `dbt build`.
+- The AI query API validates generated SQL with `sqlglot`, only allows read-only `SELECT`
+  statements over curated Gold tables, and executes against DuckDB in read-only mode.
+
+## AI Query Checks
+
+Use `/api/v1/schema` to confirm the semantic catalog before querying.
+
+For deterministic guardrail testing, `/api/v1/query` accepts an optional `sql`
+field. When `sql` is omitted, the API uses OpenAI to generate SQL from the
+question and then applies the same guardrails before execution.
+
+Example request body:
+
+```json
+{
+  "question": "Show daily trip counts by service type",
+  "max_rows": 10,
+  "sql": "select service_type, pickup_date, trip_count from gold_daily_kpis order by pickup_date, service_type"
+}
+```

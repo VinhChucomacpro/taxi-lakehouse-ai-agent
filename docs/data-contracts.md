@@ -50,3 +50,11 @@ Rules:
 - prefer explicit metrics and dimensions
 - keep `service_type` when combining Yellow and Green
 - use only business-safe, curated columns for AI access
+
+## AI Query Contract
+
+- The API may only execute `SELECT` statements.
+- SQL must reference at least one curated Gold table from `contracts/semantic_catalog.yaml`.
+- References to Bronze, Silver, system tables, external files, DML, and DDL are rejected.
+- The API enforces the caller's `max_rows` limit before execution.
+- DuckDB is opened in read-only mode for query execution.

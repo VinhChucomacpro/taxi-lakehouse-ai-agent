@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 DBT_PROJECT_DIR = Path(os.getenv("DBT_PROJECT_DIR", "/opt/airflow/dbt"))
 DBT_PROFILES_DIR = Path(os.getenv("DBT_PROFILES_DIR", "/opt/airflow/.dbt"))
 DBT_TARGET_PATH = Path(os.getenv("DBT_DUCKDB_PATH", "/opt/airflow/warehouse/analytics.duckdb"))
+LOGGER = logging.getLogger(__name__)
 
 
 def ensure_dbt_profile() -> Path:
@@ -29,7 +31,7 @@ def ensure_dbt_profile() -> Path:
 
 
 def run_dbt_build(select: str | None = None) -> None:
-    ensure_dbt_profile()
+    profile_path = ensure_dbt_profile()
     command = [
         "dbt",
         "build",
@@ -41,4 +43,6 @@ def run_dbt_build(select: str | None = None) -> None:
     if select:
         command.extend(["--select", select])
 
+    LOGGER.info("Running dbt command: %s", " ".join(command))
+    LOGGER.info("Using dbt profile at %s", profile_path)
     subprocess.run(command, check=True)

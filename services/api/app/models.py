@@ -27,6 +27,10 @@ class SchemaResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=3)
     max_rows: int = Field(default=100, ge=1, le=1000)
+    sql: str | None = Field(
+        default=None,
+        description="Optional SQL override for deterministic read-only testing.",
+    )
 
 
 class QueryResponse(BaseModel):

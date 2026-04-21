@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from lib.tlc_ingestion import build_lookup_manifest, build_trip_manifest, downlo
 
 LOCAL_DATA_ROOT = os.getenv("LOCAL_DATA_ROOT", "/opt/airflow/data")
 TLC_DOWNLOAD_TIMEOUT_SECONDS = int(os.getenv("TLC_DOWNLOAD_TIMEOUT_SECONDS", "300"))
+LOGGER = logging.getLogger(__name__)
 
 
 def resolve_run_date(data_interval_start, dag_run=None) -> datetime:
@@ -36,32 +38,49 @@ with DAG(
     @task
     def prepare_yellow_manifest(data_interval_start=None, dag_run=None) -> dict[str, str]:
         run_date = resolve_run_date(data_interval_start, dag_run)
-        return build_trip_manifest("yellow", run_date).to_dict()
+        manifest = build_trip_manifest("yellow", run_date).to_dict()
+        LOGGER.info("Prepared yellow manifest: %s", manifest)
+        return manifest
 
     @task
     def prepare_green_manifest(data_interval_start=None, dag_run=None) -> dict[str, str]:
         run_date = resolve_run_date(data_interval_start, dag_run)
-        return build_trip_manifest("green", run_date).to_dict()
+        manifest = build_trip_manifest("green", run_date).to_dict()
+        LOGGER.info("Prepared green manifest: %s", manifest)
+        return manifest
 
     @task
     def prepare_lookup_reference() -> dict[str, str]:
-        return build_lookup_manifest().to_dict()
+        manifest = build_lookup_manifest().to_dict()
+        LOGGER.info("Prepared lookup manifest: %s", manifest)
+        return manifest
 
     @task
     def ingest_to_local(manifest: dict[str, str]) -> dict[str, str]:
-        return download_file_to_local(
+        LOGGER.info(
+            "Starting local ingestion for dataset=%s into root=%s",
+            manifest["dataset"],
+            LOCAL_DATA_ROOT,
+        )
+        result = download_file_to_local(
             manifest=manifest,
             local_data_root=LOCAL_DATA_ROOT,
             timeout_seconds=TLC_DOWNLOAD_TIMEOUT_SECONDS,
         )
+        LOGGER.info("Finished local ingestion for dataset=%s: %s", manifest["dataset"], result)
+        return result
 
     @task
     def build_silver_layer() -> None:
+        LOGGER.info("Starting dbt build for Bronze and Silver layers")
         run_dbt_build("path:models/bronze path:models/silver")
+        LOGGER.info("Completed dbt build for Bronze and Silver layers")
 
     @task
     def build_gold_layer() -> None:
+        LOGGER.info("Starting dbt build for Gold layer")
         run_dbt_build("path:models/gold")
+        LOGGER.info("Completed dbt build for Gold layer")
 
     publish_metadata = EmptyOperator(task_id="publish_metadata")
     done = EmptyOperator(task_id="done")

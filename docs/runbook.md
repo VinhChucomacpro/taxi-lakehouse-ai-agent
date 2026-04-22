@@ -3,7 +3,16 @@
 ## Local Setup
 
 1. Review `.env`
-2. Start services with `docker compose up --build`
+2. Start already-built services with:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Use `docker compose up -d --build` only when Dockerfiles, Compose config,
+   dependency files such as `requirements.txt`, or image-copied source files
+   changed.
+
 3. Check:
    - Airflow at `http://localhost:8080`
    - MinIO Console at `http://localhost:9001`
@@ -91,8 +100,11 @@ Example request body:
 Start the API and demo UI:
 
 ```bash
-docker compose up --build api demo
+docker compose up -d api demo
 ```
+
+Use `--build` only when API/demo image dependencies or image-copied source files
+changed.
 
 Open `http://localhost:8501`.
 
@@ -162,8 +174,11 @@ After a successful ingestion run, bucket `taxi-lakehouse` should contain:
 Start Airflow:
 
 ```bash
-docker compose up -d --build airflow-webserver airflow-scheduler
+docker compose up -d airflow-webserver airflow-scheduler
 ```
+
+Use `--build` only when the Airflow image, DAG image dependencies, Compose config,
+or image-copied source files changed.
 
 Open `http://localhost:8080` and trigger `taxi_monthly_pipeline` with config:
 

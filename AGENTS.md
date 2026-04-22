@@ -97,6 +97,9 @@ When editing this repo, prioritize work in this order:
 - do not introduce extra frameworks without clear value
 - prefer local-first, testable implementations
 - preserve the project narrative: lakehouse first, AI agent on top
+- at the end of a meaningful working session, update the relevant docs with what
+  was completed, verified, and left as the next step so future sessions do not
+  have to rediscover it
 - before changing architecture, read `docs/modeling-decisions.md`
 - before adding tables available to AI, update `contracts/semantic_catalog.yaml`
   and corresponding guardrail/API tests
@@ -104,6 +107,10 @@ When editing this repo, prioritize work in this order:
   same change
 - when changing ingestion paths or manifests, update `docs/runbook.md` and
   ingestion tests
+- prefer `docker compose up -d` for already-built local services; use
+  `docker compose up -d --build` only after Dockerfile, image dependency,
+  requirements, or compose changes, or when a rebuild is needed to pick up code
+  copied into an image
 
 ## Suggested Verification
 

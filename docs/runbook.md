@@ -119,6 +119,15 @@ Observed row counts in the local DuckDB warehouse:
 
 Use `/api/v1/schema` to confirm the semantic catalog before querying.
 
+Current AI-visible Gold tables:
+
+- `gold_daily_kpis`
+- `gold_zone_demand`
+
+The semantic catalog includes table type, grain, dimensions, metrics, allowed
+filters, and preferred question patterns for these aggregate marts. `fact_trips`
+and Gold dimensions are intentionally not exposed directly to the AI layer.
+
 For deterministic guardrail testing, `/api/v1/query` accepts an optional `sql`
 field. When `sql` is omitted, the API uses OpenAI to generate SQL from the
 question and then applies the same guardrails before execution.

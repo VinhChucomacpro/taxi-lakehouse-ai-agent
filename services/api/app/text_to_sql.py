@@ -60,9 +60,22 @@ def render_catalog_for_prompt(catalog: SchemaResponse) -> str:
         lines.append(f"Table: {table.name}")
         if table.description:
             lines.append(f"Description: {table.description}")
+        if table.table_type:
+            lines.append(f"Type: {table.table_type}")
+        if table.grain:
+            lines.append(f"Grain: {table.grain}")
         for field in table.fields:
             description = f" - {field.description}" if field.description else ""
             lines.append(f"Column: {field.name}{description}")
+        if table.dimensions:
+            lines.append(f"Dimensions: {', '.join(table.dimensions)}")
+        for metric in table.metrics:
+            description = f" - {metric.description}" if metric.description else ""
+            lines.append(f"Metric: {metric.name}{description}")
+        if table.allowed_filters:
+            lines.append(f"Allowed filters: {', '.join(table.allowed_filters)}")
+        for question in table.preferred_questions:
+            lines.append(f"Good for: {question}")
         lines.append("")
     return "\n".join(lines).strip()
 

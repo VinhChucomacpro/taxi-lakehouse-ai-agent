@@ -17,7 +17,13 @@ class SchemaField(BaseModel):
 class SchemaTable(BaseModel):
     name: str
     description: str
+    table_type: str = "aggregate_mart"
+    grain: str = ""
     fields: list[SchemaField] = Field(default_factory=list)
+    dimensions: list[str] = Field(default_factory=list)
+    metrics: list[SchemaField] = Field(default_factory=list)
+    allowed_filters: list[str] = Field(default_factory=list)
+    preferred_questions: list[str] = Field(default_factory=list)
 
 
 class SchemaResponse(BaseModel):

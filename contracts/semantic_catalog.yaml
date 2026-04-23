@@ -1,6 +1,8 @@
 tables:
   - name: gold_daily_kpis
     description: Daily aggregate KPIs for Yellow Taxi and Green Taxi trips.
+    table_type: aggregate_mart
+    grain: One row per service type and pickup date.
     fields:
       - name: service_type
         description: Taxi service identifier, either yellow_taxi or green_taxi.
@@ -12,8 +14,27 @@ tables:
         description: Sum of fare amount for the date.
       - name: avg_trip_distance
         description: Average trip distance for the date and service type.
+    dimensions:
+      - service_type
+      - pickup_date
+    metrics:
+      - name: trip_count
+        description: Count of valid trips.
+      - name: total_fare_amount
+        description: Sum of base fare amount.
+      - name: avg_trip_distance
+        description: Average trip distance.
+    allowed_filters:
+      - service_type
+      - pickup_date
+    preferred_questions:
+      - Daily trip volume by taxi service.
+      - Daily fare totals by taxi service.
+      - Average trip distance trends by taxi service.
   - name: gold_zone_demand
     description: Aggregated demand metrics by pickup taxi zone for Yellow and Green Taxi.
+    table_type: aggregate_mart
+    grain: One row per service type, pickup date, and pickup taxi zone.
     fields:
       - name: service_type
         description: Taxi service identifier, either yellow_taxi or green_taxi.
@@ -29,3 +50,24 @@ tables:
         description: Number of trips observed in the zone.
       - name: total_amount
         description: Sum of total trip amount in the zone and day.
+    dimensions:
+      - service_type
+      - pickup_date
+      - zone_id
+      - borough
+      - zone_name
+    metrics:
+      - name: trip_count
+        description: Count of valid trips picked up in the zone.
+      - name: total_amount
+        description: Sum of total trip amount for the zone and day.
+    allowed_filters:
+      - service_type
+      - pickup_date
+      - zone_id
+      - borough
+      - zone_name
+    preferred_questions:
+      - Pickup demand by taxi zone.
+      - Top pickup zones by trip count.
+      - Zone revenue by service type and day.

@@ -54,6 +54,8 @@ Current dimensional models:
 - `dim_date`
 - `dim_zone`
 - `dim_service_type`
+- `dim_vendor`
+- `dim_payment_type`
 - `fact_trips`
 
 Rules:
@@ -66,6 +68,8 @@ Rules:
   questions
 - do not expose `fact_trips` directly to AI until semantic metadata describes
   grain, metrics, and safe join paths
+- expose aggregate Gold marts to AI through `contracts/semantic_catalog.yaml`
+  with table type, grain, dimensions, metrics, filters, and preferred questions
 
 ## AI Query Contract
 

@@ -55,8 +55,10 @@ and `dropoff_zone_id`. Base metrics include `trip_distance`, `fare_amount`,
 
 ## Phase 5: Improve AI Querying
 
-- Extend `contracts/semantic_catalog.yaml` with table type, join keys, and
-  allowed metrics.
+- Status: in progress.
+- `contracts/semantic_catalog.yaml` now describes AI-visible aggregate marts with
+  table type, grain, dimensions, metrics, allowed filters, and preferred
+  question patterns.
 - Prefer aggregate marts for common questions.
 - Allow `fact_trips` only after cataloging grain, metrics, and safe join paths.
 - Keep guardrails: `SELECT` only, Gold only, no DML/DDL, enforced `LIMIT`,

@@ -64,10 +64,9 @@ Rules:
 - keep `service_type` when combining Yellow and Green
 - use only business-safe, curated columns for AI access
 - `fact_trips` grain is one valid Silver trip per row
-- keep aggregate marts as the preferred serving surface for common BI and AI
-  questions
+- keep aggregate marts as the fast path for common BI and AI questions
 - do not expose `fact_trips` directly to AI until semantic metadata describes
-  grain, metrics, and safe join paths
+  grain, metrics, columns, keys, and safe join paths
 - expose aggregate Gold marts to AI through `contracts/semantic_catalog.yaml`
   with table type, grain, dimensions, metrics, filters, and preferred questions
 

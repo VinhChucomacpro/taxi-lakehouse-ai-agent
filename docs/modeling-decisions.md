@@ -15,18 +15,18 @@ Current flow:
 
 The MVP now has two Gold serving layers:
 
-- dimensional models: `dim_date`, `dim_zone`, `dim_service_type`,
-  `dim_vendor`, `dim_payment_type`, `fact_trips`
+- Gold star schema: `fact_trips`, `dim_date`, `dim_zone`, `dim_service_type`,
+  `dim_vendor`, `dim_payment_type`
 - curated aggregate marts: `gold_daily_kpis`, `gold_zone_demand`
 
-The aggregate marts remain the AI-preferred serving surface:
+The aggregate marts remain a fast and safe serving surface:
 
 - `gold_daily_kpis`
 - `gold_zone_demand`
 
-This matches the current question patterns: daily KPIs, service type splits, and
-zone-level demand. Aggregate marts keep the AI query surface small, reduce joins,
-and make guardrails easier to reason about.
+This matches common question patterns: daily KPIs, service type splits, and
+zone-level demand. Aggregate marts keep simple AI queries fast and reduce joins,
+but they do not replace the Gold star schema.
 
 ## Why Dim/Fact Was Added After MVP Verification
 
@@ -59,11 +59,14 @@ type, pickup zone, and dropoff zone. It does not replace aggregate marts.
 `gold_daily_kpis` and `gold_zone_demand` are serving marts built from
 `fact_trips` and related dimensions.
 
-## AI Query Rules
+## AI Query Direction
 
 - AI may query only Gold objects listed in the semantic catalog.
-- Prefer aggregate marts for common questions.
-- Keep `fact_trips` out of the AI catalog until its grain, metrics, and safe join
-  paths are cataloged.
+- Prefer aggregate marts for simple common questions.
+- Use controlled star-schema querying for vendor, payment type, pickup/dropoff
+  role, and flexible fact/dim analysis after semantic metadata and join
+  guardrails are implemented.
+- Keep `fact_trips` out of executable AI access until its grain, metrics,
+  columns, keys, and safe join paths are cataloged and tested.
 - Never expose Bronze or Silver to AI.
 - Never allow DML, DDL, or external file access.

@@ -115,6 +115,25 @@ Observed row counts in the local DuckDB warehouse:
 - `gold_daily_kpis`: `124`
 - `gold_zone_demand`: `20727`
 
+## Last Verified Agent Workflow State
+
+Last workflow and roadmap update: `2026-04-23`.
+
+Completed documentation state:
+
+- Gold star schema is documented as implemented for the MVP.
+- Aggregate marts are documented as a fast/safe path, not a replacement for star
+  schema querying.
+- The next roadmap step is `Phase 6: Star Schema Semantic Catalog`.
+- Agent handoff rules require updating roadmap status, verification notes,
+  caveats, and next steps after each meaningful phase or session.
+
+Verification for this docs-focused update:
+
+- Review consistency across `AGENTS.md`, `docs/codex-agent-playbook.md`,
+  `docs/development-roadmap.md`, `docs/modeling-decisions.md`, and this runbook.
+- `python -m pytest -p no:cacheprovider` passed with `9 passed, 2 skipped`.
+
 ## AI Query Checks
 
 Use `/api/v1/schema` to confirm the semantic catalog before querying.

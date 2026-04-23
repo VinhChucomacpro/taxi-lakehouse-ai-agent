@@ -10,6 +10,19 @@ story: lakehouse first, read-only AI agent on top.
 3. `docs/modeling-decisions.md` for Gold, marts, dim/fact, or semantic-layer work.
 4. `docs/development-roadmap.md` for phased direction.
 5. `docs/runbook.md` for Airflow, dbt, operations, and verification.
+6. `contracts/semantic_catalog.yaml` before any AI query or guardrail work.
+
+## Current Project State
+
+- Gold star schema is implemented for the MVP.
+- Star schema models are `fact_trips`, `dim_date`, `dim_zone`,
+  `dim_service_type`, `dim_vendor`, and `dim_payment_type`.
+- Aggregate marts `gold_daily_kpis` and `gold_zone_demand` are built from the
+  star schema. They are a fast/safe path for common questions, not a replacement
+  for the star schema.
+- The current roadmap direction is controlled AI querying over the Gold star
+  schema, starting with semantic metadata and then column/table and join
+  guardrails.
 
 ## Session Closeout
 
@@ -26,6 +39,11 @@ changes project state or operational knowledge:
 
 The note should include what was completed, what was verified, known caveats,
 and the recommended next step. Do not include secrets from `.env`.
+
+When a phase is completed, explicitly record `completed`, `in progress`,
+`planned`, or `blocked` in `docs/development-roadmap.md`. Include verification
+commands and results in `docs/runbook.md` when tests, dbt, Docker, API, or demo
+behavior were checked.
 
 ## Architecture Rules
 
@@ -69,11 +87,10 @@ and the recommended next step. Do not include secrets from `.env`.
 ### Gold
 
 - MVP serving marts are `gold_daily_kpis` and `gold_zone_demand`.
-- Gold dimensional models exist: `dim_date`, `dim_zone`, `dim_service_type`, and
-  `fact_trips`.
+- Gold star schema exists: `fact_trips`, `dim_date`, `dim_zone`,
+  `dim_service_type`, `dim_vendor`, and `dim_payment_type`.
 - `fact_trips` grain should be one valid Silver trip per row.
-- Keep aggregate marts as the preferred surface for common dashboard and AI
-  questions.
+- Keep aggregate marts as the fast path for common dashboard and AI questions.
 - If adding a Gold model, update `dbt/models/schema.yml`, docs, and
   `contracts/semantic_catalog.yaml` when AI may query it.
 
@@ -88,16 +105,21 @@ Use this direction when maintaining dimensional models:
 - `fact_trips`: from `silver_trips_unified`, with base metrics such as
   `trip_distance`, `fare_amount`, `total_amount`, and `passenger_count`.
 
-Do not make AI join facts for every recurring question. If a question becomes
-common, create a Gold mart and expose that mart through the semantic catalog.
+Do not assume `fact_trips` should be avoided forever. The intended next step is
+controlled AI querying over the star schema after semantic metadata, column
+guardrails, and join guardrails are in place. If a question becomes very common,
+a Gold aggregate mart can still be added as a fast path.
 
 ## AI Query Layer
 
 - `contracts/semantic_catalog.yaml` is the AI-visible Gold catalog.
 - `services/api/app/sql_guardrails.py` blocks unsafe SQL.
+- `services/api/app/text_to_sql.py` renders semantic metadata into the LLM prompt.
+- `services/api/app/catalog.py` loads catalog metadata for the API and prompt.
 - When exposing new tables to AI, add clear field descriptions.
-- For future facts/dims, catalog table type, grain, metrics, and join keys before
-  allowing AI access.
+- Before exposing `fact_trips` or any `dim_*` table, catalog table type, grain,
+  fields, metrics, keys, allowed filters, and allowed joins, then add guardrail
+  and API tests.
 
 ## Verification By Change Type
 
@@ -117,7 +139,8 @@ python -m pytest -p no:cacheprovider
 ## Defaults When Details Are Missing
 
 - Architecture: follow `AGENTS.md`.
-- Modeling: keep Silver trip-level and Gold serving-oriented.
+- Modeling: keep Silver trip-level; keep Gold centered on the star schema with
+  aggregate marts as the fast path.
 - AI safety: choose the more restrictive query surface.
 - New features: prefer small, testable increments over new sources/frameworks.
 - Local stack: start existing images with `docker compose up -d`; rebuild only

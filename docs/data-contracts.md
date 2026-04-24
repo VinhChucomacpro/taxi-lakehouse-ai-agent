@@ -51,7 +51,7 @@ partition month.
 
 ## Gold Contract
 
-Gold is the serving layer for analytics and AI.
+Gold is the serving layer for analytics and the read-only AI query agent.
 
 Current marts:
 
@@ -73,16 +73,16 @@ Rules:
 - keep `service_type` when combining Yellow and Green
 - use only business-safe, curated columns for AI access
 - `fact_trips` grain is one valid Silver trip per row
-- keep aggregate marts as the fast path for common BI and AI questions
-- expose Gold marts, `fact_trips`, and dimensions to AI through
+- keep aggregate marts as the fast path for common BI and agent questions
+- expose Gold marts, `fact_trips`, and dimensions to the agent through
   `contracts/semantic_catalog.yaml` with table type, grain, dimensions, metrics,
   filters, keys, and safe join paths
 - detailed Gold tables such as `fact_trips` require explicit columns and
   cataloged joins; wildcard `SELECT *` is rejected
 
-## AI Query Contract
+## AI Query Agent Contract
 
-- The API may only execute `SELECT` statements.
+- The agent may only execute validated `SELECT` statements.
 - SQL must reference at least one curated Gold table from `contracts/semantic_catalog.yaml`.
 - References to Bronze, Silver, system tables, external files, DML, and DDL are rejected.
 - Referenced columns must be present in the semantic catalog for the referenced
@@ -93,3 +93,11 @@ Rules:
   the semantic catalog. Cartesian joins and `CROSS JOIN` are rejected.
 - The API enforces the caller's `max_rows` limit before execution.
 - DuckDB is opened in read-only mode for query execution.
+- `/api/v1/query` responses include legacy query fields plus agent metadata:
+  `answer`, `agent_steps`, `warnings`, `confidence`,
+  `requires_clarification`, and `clarification_question`.
+- The agent may ask for clarification instead of executing when a natural
+  language request is too broad to safely plan.
+- Final answers must be grounded in executed rows. OpenAI answer synthesis is
+  opt-in through `OPENAI_ANSWER_SYNTHESIS`; deterministic summaries are the
+  default.

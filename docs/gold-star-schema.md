@@ -16,7 +16,7 @@ Gold star schema models:
 - `dim_payment_type`
 
 These models are implemented in dbt Gold and are the dimensional base for
-aggregate marts and future controlled AI querying.
+aggregate marts and controlled read-only agent querying.
 
 ## Table Structure
 
@@ -139,12 +139,12 @@ Approved star-schema join paths:
 - `fact_trips.dropoff_zone_id = dim_zone.zone_id`
 
 These are the intended join paths to be reflected in
-`contracts/semantic_catalog.yaml` and future SQL guardrails.
+`contracts/semantic_catalog.yaml` and enforced by SQL guardrails.
 
 ## Notes
 
 - Aggregate marts such as `gold_daily_kpis` and `gold_zone_demand` remain the
-  fast path for common dashboard and AI questions.
+  fast path for common dashboard and agent questions.
 - The star schema does not replace the aggregate marts.
-- `fact_trips` should not be broadly exposed to the AI layer until semantic
-  metadata and join guardrails are implemented and tested.
+- `fact_trips` is exposed to the read-only agent only through semantic metadata,
+  explicit columns, wildcard restrictions, and approved join paths.

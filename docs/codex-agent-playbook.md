@@ -10,7 +10,7 @@ story: lakehouse first, read-only AI agent on top.
 3. `docs/modeling-decisions.md` for Gold, marts, dim/fact, or semantic-layer work.
 4. `docs/development-roadmap.md` for phased direction.
 5. `docs/runbook.md` for Airflow, dbt, operations, and verification.
-6. `contracts/semantic_catalog.yaml` before any AI query or guardrail work.
+6. `contracts/semantic_catalog.yaml` before any agent query or guardrail work.
 
 ## Quick File Reference
 
@@ -28,11 +28,11 @@ the repo first.
 | Gold dim/fact SQL models | `dbt/models/gold/` | Includes `fact_trips`, `dim_*`, and marts |
 | ingestion DAG orchestration | `airflow/dags/` | Use for schedule and pipeline flow changes |
 | ingestion implementation and tests | `tests/test_tlc_ingestion.py` | Start here for ingestion regressions |
-| AI-visible semantic metadata | `contracts/semantic_catalog.yaml` | Required before exposing new AI-queryable tables |
+| agent-visible semantic metadata | `contracts/semantic_catalog.yaml` | Required before exposing new agent-queryable tables |
 | SQL safety and query restrictions | `services/api/app/sql_guardrails.py` | Main guardrail logic |
 | read-only query agent orchestration | `services/api/app/agent.py` | Intent, planning, SQL, validation, execution, self-check, answer trace |
 | semantic catalog loading in API | `services/api/app/catalog.py` | Reads and validates catalog for app usage |
-| prompt assembly for Text-to-SQL | `services/api/app/text_to_sql.py` | Main LLM prompt rendering path |
+| SQL prompt assembly component | `services/api/app/text_to_sql.py` | Used behind the read-only agent orchestrator |
 | API entrypoints and query execution path | `services/api/app/` | Inspect alongside guardrails and catalog |
 | SQL guardrail tests | `tests/test_sql_guardrails.py` | Update when SQL policy changes |
 | semantic catalog tests | `tests/test_semantic_catalog.py` | Update when catalog shape or validation changes |
@@ -47,9 +47,10 @@ the repo first.
 - Aggregate marts `gold_daily_kpis` and `gold_zone_demand` are built from the
   star schema. They are a fast/safe path for common questions, not a replacement
   for the star schema.
-- Controlled AI querying over the Gold star schema is implemented for the
-  current MVP. Semantic metadata, column/table guardrails, join guardrails,
-  prompt planning, fact/dim execution, and read-only agent tracing are in place.
+- Controlled read-only agent querying over the Gold star schema is implemented
+  for the current MVP. Semantic metadata, column/table guardrails, join
+  guardrails, prompt planning, fact/dim execution, and agent tracing are in
+  place.
 
 ## Session Closeout
 
@@ -78,8 +79,8 @@ behavior were checked.
   user explicitly changes direction.
 - Do not add FHV, HVFHV, streaming, write-capable agents, or production auth
   before the MVP lakehouse is stable.
-- Do not let AI query Bronze or Silver.
-- Do not add DML or DDL capability to the AI query path.
+- Do not let the agent query Bronze or Silver.
+- Do not add DML or DDL capability to the agent query path.
 - Prefer explicit semantic metadata over business inference from column names.
 
 ## Docker Workflow
@@ -128,9 +129,9 @@ behavior were checked.
 - Gold star schema exists: `fact_trips`, `dim_date`, `dim_zone`,
   `dim_service_type`, `dim_vendor`, and `dim_payment_type`.
 - `fact_trips` grain should be one valid Silver trip per row.
-- Keep aggregate marts as the fast path for common dashboard and AI questions.
+- Keep aggregate marts as the fast path for common dashboard and agent questions.
 - If adding a Gold model, update `dbt/models/schema.yml`, docs, and
-  `contracts/semantic_catalog.yaml` when AI may query it.
+  `contracts/semantic_catalog.yaml` when the agent may query it.
 
 ## Dim/Fact Layer
 
@@ -150,7 +151,7 @@ becomes very common, a Gold aggregate mart can still be added as a fast path.
 
 ## AI Query Layer
 
-- `contracts/semantic_catalog.yaml` is the AI-visible Gold catalog.
+- `contracts/semantic_catalog.yaml` is the agent-visible Gold catalog.
 - `execution_enabled` in the semantic catalog controls whether a cataloged Gold
   table is currently allowed in prompt generation and `/api/v1/query`.
 - `services/api/app/agent.py` orchestrates the read-only agent workflow:
@@ -167,7 +168,7 @@ becomes very common, a Gold aggregate mart can still be added as a fast path.
   `include_disabled=True` only for planning/tests if a future phase catalogs
   tables before exposing them.
 - `services/api/app/catalog.py` loads catalog metadata for the API and prompt.
-- When exposing new tables to AI, add clear field descriptions.
+- When exposing new tables to the agent, add clear field descriptions.
 - Before exposing `fact_trips` or any `dim_*` table, catalog table type, grain,
   fields, metrics, keys, allowed filters, and allowed joins, then add guardrail
   and API tests.

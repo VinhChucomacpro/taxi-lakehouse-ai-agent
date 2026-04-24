@@ -3,7 +3,7 @@
 ## Goal
 
 This project builds a local-first analytics platform on NYC TLC taxi data with a
-read-only AI query interface.
+read-only AI query agent over curated Gold data.
 
 ## Main Components
 
@@ -11,7 +11,8 @@ read-only AI query interface.
 - `MinIO` stores raw Bronze files as S3-compatible object storage.
 - `dbt` models the transformation layers.
 - `DuckDB` serves local analytics and query execution.
-- `FastAPI` exposes schema and query endpoints to the AI layer.
+- `FastAPI` exposes schema and query endpoints and hosts the read-only agent
+  workflow.
 - `Streamlit` provides a local demo UI.
 
 ## Data Flow
@@ -24,7 +25,10 @@ read-only AI query interface.
    DuckDB `httpfs`.
 5. dbt builds Silver normalized trip data and Gold star-schema models/marts in
    DuckDB.
-6. FastAPI and Streamlit query curated Gold data through read-only DuckDB access.
+6. FastAPI runs the read-only agent workflow and executes validated SQL against
+   curated Gold data through read-only DuckDB access.
+7. Streamlit displays agent traces, answers, SQL, tables, charts, and CSV
+   exports for local demos.
 
 ## Storage Roles
 
@@ -42,15 +46,15 @@ Gold contains both:
   `dim_vendor`, and `dim_payment_type`
 - aggregate marts: `gold_daily_kpis` and `gold_zone_demand`
 
-Aggregate marts are the fast path for common dashboard and AI questions. The
+Aggregate marts are the fast path for common dashboard and agent questions. The
 star schema is the flexible analytical foundation and is exposed through
 controlled API access after semantic metadata, column guardrails, wildcard
 restrictions, and join guardrails validate generated SQL.
 
 ## Serving Principle
 
-The AI layer must not query raw Bronze or partially cleaned Silver data. It
-should operate over curated Gold tables and semantic metadata, with SQL validated
+The read-only agent must not query raw Bronze or partially cleaned Silver data.
+It operates over curated Gold tables and semantic metadata, with SQL validated
 before execution. Fact/dimension queries must use explicit cataloged columns and
 approved semantic join paths.
 
@@ -62,3 +66,8 @@ service: intent analysis, query-surface planning, SQL generation, guardrail
 validation, DuckDB execution, result self-checks, and answer synthesis. This
 keeps the agent behavior visible for demos while preserving the project's
 local-first, framework-light architecture.
+
+The agent response includes both data and traceability: final answer,
+`agent_steps`, warnings, confidence, optional clarification prompts, validated
+SQL, result columns, rows, and execution time. Natural-language answer synthesis
+with OpenAI is opt-in; deterministic answers remain the default demo-safe path.

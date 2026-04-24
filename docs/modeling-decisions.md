@@ -9,7 +9,7 @@ Current flow:
 
 1. `Bronze` keeps source data as raw as practical.
 2. `Silver` normalizes Yellow and Green into one trip-level schema.
-3. `Gold` serves BI, dashboards, and the read-only AI query API.
+3. `Gold` serves BI, dashboards, and the read-only AI query agent.
 
 ## Current Decision
 
@@ -34,10 +34,10 @@ Dim/fact modeling was deferred until the basic MVP flow was verified because it
 adds early complexity:
 
 - More grain, key, and join-policy decisions.
-- Higher risk of Text-to-SQL generating invalid or overly detailed joins.
+- Higher risk of generated SQL using invalid or overly detailed joins.
 - More guardrail complexity than a small set of curated Gold marts.
 
-After ingestion, transforms, data quality checks, and safe AI querying were
+After ingestion, transforms, data quality checks, and safe agent querying were
 verified, the Gold dimensional layer was added. The marts still exist so common
 queries do not need to touch fact-level data directly.
 
@@ -62,9 +62,10 @@ type, pickup zone, and dropoff zone. It does not replace aggregate marts.
 `gold_daily_kpis` and `gold_zone_demand` are serving marts built from
 `fact_trips` and related dimensions.
 
-## AI Query Direction
+## AI Query Agent Direction
 
-- AI may query only Gold objects listed in the semantic catalog.
+- The read-only query agent may query only Gold objects listed in the semantic
+  catalog.
 - The semantic catalog now distinguishes between cataloged Gold objects and
   execution-enabled Gold objects.
 - `gold_daily_kpis`, `gold_zone_demand`, `fact_trips`, and the Gold dimensions
@@ -74,5 +75,10 @@ type, pickup zone, and dropoff zone. It does not replace aggregate marts.
   pickup/dropoff role, and flexible fact/dim analysis.
 - Fact/dim access is controlled by semantic metadata, allowed columns,
   wildcard restrictions, and allowed join paths.
-- Never expose Bronze or Silver to AI.
+- The FastAPI agent orchestrator performs intent analysis, planning, SQL
+  generation, guardrail validation, execution, self-checks, and answer
+  generation.
+- Agent responses include trace metadata so the demo can show where the agent
+  made planning and safety decisions.
+- Never expose Bronze or Silver to the agent.
 - Never allow DML, DDL, or external file access.

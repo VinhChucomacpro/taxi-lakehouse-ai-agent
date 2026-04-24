@@ -13,9 +13,11 @@ The current architecture is coherent for a local-first analytical lakehouse:
 - Local `data/` files are ingestion cache and development fallback only.
 - dbt owns `Bronze -> Silver -> Gold` transformations and data tests.
 - DuckDB is the local analytical warehouse for Gold serving.
-- FastAPI exposes read-only schema and query endpoints.
-- The AI layer is constrained by semantic metadata and SQL guardrails before
-  DuckDB execution.
+- FastAPI exposes read-only schema/query endpoints and hosts the internal agent
+  workflow.
+- The read-only agent is constrained by semantic metadata and SQL guardrails
+  before DuckDB execution, then returns agent steps, warnings, confidence, and
+  an answer grounded in executed rows.
 
 This shape is appropriate for the project goal because it separates ingestion,
 modeling, serving, and AI safety. It also keeps the stack explainable for a
@@ -27,20 +29,22 @@ graduation project without adding unnecessary agent frameworks.
   standardizes Yellow and Green trips, and Gold serves analytics and AI.
 - Gold now has both a dimensional star schema and aggregate marts. This gives a
   fast path for common questions while preserving a flexible analytical base.
-- `contracts/semantic_catalog.yaml` is an explicit AI-facing contract instead
-  of relying on table names alone.
+- `contracts/semantic_catalog.yaml` is an explicit agent-facing contract
+  instead of relying on table names alone.
 - `execution_enabled` separates cataloged tables from executable tables, so
   `fact_trips` and dimensions can be documented before they are exposed.
 - DuckDB is opened in read-only mode and generated SQL is parsed with
-  `sqlglot`, which makes the AI query surface safer and easier to defend.
+  `sqlglot`, which makes the agent query surface safer and easier to defend.
+- The read-only agent workflow is explicit and framework-light: intent,
+  planning, SQL generation, validation, execution, self-check, and answer.
 - The scope is controlled: Yellow Taxi, Green Taxi, and Taxi Zone Lookup only.
 
 ## Known Limitations
 
 - SQL guardrails validate tables, execution status, cataloged columns, and
-  approved semantic join paths. The Text-to-SQL planner now prefers aggregate
-  marts for common questions, while controlled fact/dim API exposure supports
-  vendor, payment type, pickup zone, and dropoff zone analysis.
+  approved semantic join paths. The agent planner prefers aggregate marts for
+  common questions, while controlled fact/dim API exposure supports vendor,
+  payment type, pickup zone, and dropoff zone analysis.
 - The semantic catalog, dbt schema docs, and human documentation are separate
   sources that can drift. A future consistency test should compare Gold model
   names and catalog entries.
@@ -66,9 +70,12 @@ Use this narrative when explaining the system:
 3. dbt makes transformation logic repeatable and testable.
 4. Gold has two serving surfaces: aggregate marts for safe common questions and
    star schema for controlled flexible analysis.
-5. AI is intentionally constrained. It does not query Bronze or Silver, cannot
-   write data, and only executes SQL after semantic and syntactic validation.
-6. `fact_trips` and dimensions are queryable only through semantic metadata,
+5. The read-only agent is intentionally constrained. It does not query Bronze or
+   Silver, cannot write data, and only executes SQL after semantic and syntactic
+   validation.
+6. The agent workflow records intent, plan, guardrail, execution, self-check,
+   and answer steps for demo and defense transparency.
+7. `fact_trips` and dimensions are queryable only through semantic metadata,
    explicit columns, and approved joins. This is the controlled star-schema
    path.
 
@@ -101,8 +108,9 @@ Priority 3: Catalog and documentation consistency
 
 Priority 4: Demo and defense readiness
 
-- Use a stable demo flow: schema view, valid mart query, blocked unsafe query,
-  and blocked fact query before join guardrails.
+- Use a stable demo flow: schema view, Ask AI with agent timeline, valid mart
+  query, controlled star-schema query, blocked unsafe query, chart, and CSV
+  export.
 - Run full tests in an environment where `sqlglot`, `duckdb`, `httpx`, and API
   dependencies are installed.
 - Record verification date, command output, caveats, and next step in

@@ -56,8 +56,9 @@
   are cache/fallback files.
 - Airflow runs `dbt build` inside the scheduler/webserver image using `dbt-duckdb`.
 - The local `Bronze -> Silver -> Gold` path can be validated with `dbt build`.
-- The AI query API validates generated SQL with `sqlglot`, only allows read-only `SELECT`
-  statements over curated Gold tables, and executes against DuckDB in read-only mode.
+- The read-only agent API plans natural-language questions over curated Gold,
+  validates SQL with `sqlglot`, only allows read-only `SELECT` statements, runs
+  self-checks, and executes against DuckDB in read-only mode.
 
 ## Last Verified MVP State
 
@@ -193,9 +194,9 @@ Implemented behavior:
   `foreign_keys`, and `allowed_joins` metadata.
 - `/api/v1/schema` returns the full Gold catalog, including cataloged but
   execution-disabled tables.
-- `/api/v1/query` and Text-to-SQL prompt rendering now use only
-  `execution_enabled: true` tables, so `fact_trips` and `dim_*` remain blocked
-  until later guardrail phases.
+- `/api/v1/query` uses the semantic catalog through the read-only agent
+  orchestrator. Only `execution_enabled: true` Gold tables can be planned,
+  prompted, validated, or executed.
 
 Verification for this update:
 
@@ -210,9 +211,9 @@ Notes:
 
 - The semantic catalog is now both metadata contract and execution-gating
   contract.
-- Aggregate marts remain the only current AI-executable Gold surface.
-- This state was superseded by the controlled fact/dim exposure verification on
-  `2026-04-24`.
+- At this historical checkpoint, aggregate marts were the only executable Gold
+  surface. This state was superseded by controlled fact/dim exposure and the
+  read-only agent workflow verification on `2026-04-24`.
 
 ## Last Verified Architecture Review And Guardrail State
 
@@ -286,11 +287,11 @@ Verification:
   `gold_daily_kpis` query and HTTP `400` for direct `fact_trips` access at
   Phase 8 time.
 
-## AI Query Checks
+## Read-Only Agent Checks
 
 Use `/api/v1/schema` to confirm the semantic catalog before querying.
 
-Current AI-visible and executable Gold tables:
+Current agent-visible and executable Gold tables:
 
 - `gold_daily_kpis`
 - `gold_zone_demand`
@@ -362,6 +363,33 @@ Verification:
 - Demo container inspection confirmed the running app contains the agent
   timeline UI.
 
+## Last Verified Documentation Alignment State
+
+Last documentation alignment verification: `2026-04-24`.
+
+Updated documentation:
+
+- `README.md` now presents the project as a local-first lakehouse with a
+  read-only AI query agent, not a standalone Text-to-SQL demo.
+- `docs/architecture.md` and `docs/architecture-review.md` describe the FastAPI
+  orchestrator, agent trace, self-checks, clarification behavior, and opt-in
+  answer synthesis.
+- `docs/data-contracts.md`, `docs/modeling-decisions.md`, and
+  `docs/gold-star-schema.md` align Gold, semantic catalog, and controlled
+  fact/dim access with the agent contract.
+- `AGENTS.md` and `docs/codex-agent-playbook.md` direct future sessions to keep
+  Text-to-SQL generation behind `services/api/app/agent.py`.
+- `docs/development-roadmap.md` records Phase 11A-11G as completed and keeps the
+  handoff rule focused on agent-visible schema and guardrail changes.
+
+Verification:
+
+- Documentation terminology review checked for stale `AI layer`,
+  `AI-visible`, `AI-executable`, `Text-to-SQL style`, and `query service`
+  wording.
+- Remaining Text-to-SQL mentions are historical phase labels or explicit notes
+  that prompt generation is a component behind the agent orchestrator.
+
 ## Last Verified Controlled Fact/Dim Exposure State
 
 Last controlled fact/dim exposure verification: `2026-04-24`.
@@ -370,8 +398,8 @@ Implemented behavior:
 
 - `fact_trips` and Gold dimensions are now `execution_enabled: true` in
   `contracts/semantic_catalog.yaml`.
-- Runtime Text-to-SQL prompt rendering includes aggregate marts, fact table,
-  dimensions, and allowed joins.
+- Runtime agent planning and Text-to-SQL prompt rendering include aggregate
+  marts, fact table, dimensions, and allowed joins.
 - API query execution configures DuckDB S3/MinIO settings before executing
   read-only SQL, so `dim_zone` can resolve the MinIO-backed Taxi Zone Lookup
   reference view.
@@ -428,6 +456,10 @@ Verification:
 
 Last Text-to-SQL planner verification: `2026-04-24`.
 
+This historical state was superseded by the read-only agent workflow verification
+on `2026-04-24`. Text-to-SQL prompt rendering remains a component used behind
+the agent orchestrator, not the full API behavior.
+
 Implemented behavior:
 
 - Prompt rendering now starts with planner policy: prefer aggregate marts for
@@ -455,17 +487,20 @@ Verification:
   planning context included `fact_trips`, dimensions, and allowed joins.
 - This runtime prompt surface was expanded in Phase 10 after controlled
   fact/dim exposure.
-- `docker compose restart api` restarted the running API service so Text-to-SQL
-  requests use the updated prompt code.
+- `docker compose restart api` restarted the running API service so the agent
+  orchestrator uses the updated prompt code.
 
 ## Last Verified Common Demo Query Planner Fix
 
 Last common demo query planner verification: `2026-04-24`.
 
+This historical fix is now part of the deterministic planning behavior inside
+the read-only agent orchestrator.
+
 Implemented behavior:
 
-- Text-to-SQL now short-circuits common monthly Yellow/Green trip comparison
-  questions to a deterministic `gold_daily_kpis` query before calling OpenAI.
+- The agent now routes common monthly Yellow/Green trip comparison questions to
+  a deterministic `gold_daily_kpis` plan before calling OpenAI.
 - The deterministic query handles Vietnamese phrasing such as
   `so sánh chuyến đi xanh và vàng các tháng trong năm 2023`.
 - Prompt policy now states that aggregate marts are already denormalized and
@@ -532,7 +567,9 @@ Recommended demo flow:
 3. Use `SQL Test` with the default query to show deterministic DuckDB results.
 4. Use `Guardrails` to show that Silver access is blocked.
 5. Use the auto chart selector and agent checks to show result diagnostics.
-6. Use `Ask AI` to generate SQL from a natural-language question when `OPENAI_API_KEY` is configured.
+6. Use `Ask AI` to show the agent timeline, answer, SQL, result table, optional
+   chart, and export. Deterministic agent paths work without `OPENAI_API_KEY`;
+   broader LLM-planned questions still require it.
 
 ## Last Verified Demo Visualization State
 

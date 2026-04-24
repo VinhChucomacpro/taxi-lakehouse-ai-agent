@@ -1,21 +1,21 @@
 # Development Roadmap
 
-This roadmap keeps the lakehouse MVP stable while moving the AI layer toward
-controlled querying over the Gold star schema.
+This roadmap keeps the lakehouse MVP stable while moving the read-only AI query
+agent toward controlled querying over the Gold star schema.
 
 ## Principles
 
 - Current sources: Yellow Taxi, Green Taxi, Taxi Zone Lookup.
 - Keep the project local-first, repeatable, and testable.
 - Defer FHV, HVFHV, streaming, write-capable agents, LangChain/LangGraph, and
-  production auth until the current MVP and AI star-schema path are stable.
+  production auth until the current MVP and agent star-schema path are stable.
 - Gold is the serving layer. It contains both the star schema and aggregate
   marts.
 - MinIO is the Bronze object-storage source of truth. Local `data/` files are
   ingestion cache/fallback files.
 - Aggregate marts are the fast path for common questions. They do not replace
   the Gold star schema.
-- AI may query `fact_trips` and dimensions through semantic metadata,
+- The agent may query `fact_trips` and dimensions through semantic metadata,
   execution flags, column guardrails, wildcard restrictions, and join guardrails.
 
 ## Phase 1: Stabilize MVP Lakehouse
@@ -36,7 +36,7 @@ Status: completed for the MVP; ongoing for anomaly checks.
 - Track important anomalies: pickup dates outside partition month, unusual trip
   distance, negative amounts, and dropoff before pickup.
 - Keep the verification checklist in `docs/runbook.md` current.
-- Keep the semantic catalog aligned with AI-queryable Gold objects.
+- Keep the semantic catalog aligned with agent-queryable Gold objects.
 
 ## Phase 3: Gold Star Schema
 
@@ -65,7 +65,7 @@ Status: completed for the current serving marts.
 
 - `gold_daily_kpis` is built from `fact_trips`.
 - `gold_zone_demand` is built from `fact_trips` joined to `dim_zone`.
-- Aggregate marts remain useful for common dashboard and AI questions, but they
+- Aggregate marts remain useful for common dashboard and agent questions, but they
   are not a substitute for the Gold star schema.
 
 ## Phase 5: Update Codex Workflow, Project State, And Session Handoff
@@ -77,7 +77,7 @@ Completed:
 - Updated project guidance so future Codex sessions know the Gold star schema is
   already implemented.
 - Clarified that aggregate marts are a fast/safe path, while the next direction
-  is controlled AI querying over `fact_trips` and `dim_*`.
+  is controlled agent querying over `fact_trips` and `dim_*`.
 - Added session handoff rules: after completing a phase, update the roadmap,
   verification notes, caveats, and next step.
 
@@ -152,7 +152,7 @@ Completed:
 Status: completed on 2026-04-24.
 
 Goal: validate generated SQL against the semantic catalog at table and column
-level without widening the executable AI query surface.
+level without widening the executable agent query surface.
 
 Completed:
 
@@ -385,7 +385,8 @@ Completed:
 
 Verification:
 
-- README, architecture docs, roadmap, and runbook use consistent terminology.
+- README, architecture docs, data contracts, modeling docs, Gold schema docs,
+  runbook, playbook, and `AGENTS.md` use consistent read-only agent terminology.
 
 ## Phase 11B: Agent Response Contract
 
@@ -467,7 +468,8 @@ Completed:
   metrics, unusual date ranges, and missing expected grouping columns.
 - Always return a deterministic answer summary.
 - Optionally use OpenAI to synthesize a natural-language answer from the
-  already-executed SQL and returned rows when an API key is configured.
+  already-executed SQL and returned rows only when `OPENAI_ANSWER_SYNTHESIS=true`
+  and an API key is configured.
 - Do not let answer synthesis generate new SQL or access external data.
 
 Verification:
@@ -538,8 +540,8 @@ state before stopping:
 - `docs/modeling-decisions.md`: modeling decisions or changes to the role of
   star schema and marts.
 - `docs/codex-agent-playbook.md`: workflow rule changes for future agents.
-- `contracts/semantic_catalog.yaml` and related tests: any AI-visible schema or
-  guardrail change.
+- `contracts/semantic_catalog.yaml` and related tests: any agent-visible schema
+  or guardrail change.
 
 Use explicit statuses: `completed`, `in progress`, `planned`, or `blocked`.
 Do not end a meaningful session with ambiguous project state.

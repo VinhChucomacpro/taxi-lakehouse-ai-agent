@@ -52,9 +52,29 @@ agent framework unless the user explicitly asks for that change.
 - Aggregate marts `gold_daily_kpis` and `gold_zone_demand` are built from the
   star schema and remain useful as a fast/safe path for common dashboard and AI
   questions.
+- The semantic catalog covers the full Gold star schema, but only aggregate
+  marts are currently `execution_enabled`.
+- Column/table guardrails validate cataloged tables, execution-enabled tables,
+  known columns, table aliases, and wildcard restrictions for detailed Gold
+  tables.
+- Join guardrails validate explicit `ON` joins against semantic catalog
+  `allowed_joins` and reject missing-`ON` or cartesian joins.
 - The next major direction is controlled AI querying over the Gold star schema:
-  semantic metadata first, then column/table guardrails, join guardrails, prompt
-  planning, and finally controlled fact/dim API exposure.
+  prompt planning, and finally controlled fact/dim API exposure.
+
+## Local Environment Notes
+
+- Docker images have already been built for this project environment.
+- Prefer starting the existing stack with `docker compose up -d`.
+- Do not install project runtime dependencies into the host Python environment
+  just because local pytest skips dependency-gated tests. The API container
+  already has runtime dependencies such as `sqlglot` and `duckdb`.
+- For SQL guardrail/API verification, prefer running checks inside Docker,
+  especially the `api` container, unless the user explicitly asks for host-local
+  setup.
+- Use `docker compose up -d --build` only after Dockerfile, image dependency,
+  requirements, or compose changes, or when a rebuild is needed to pick up code
+  copied into an image.
 
 ## Data Modeling Rules
 
@@ -94,6 +114,7 @@ When editing this repo, prioritize work in this order:
 - no access outside curated `Gold` objects
 - validate generated SQL before execution
 - apply limits to ad hoc queries
+- enforce allowed semantic join paths before fact/dim execution is enabled
 - prefer explicit semantic metadata over inferring business meaning from names
 
 ## Repo Navigation
@@ -130,10 +151,8 @@ When editing this repo, prioritize work in this order:
   ingestion tests
 - when changing Bronze storage or dbt read paths, update `docs/data-contracts.md`,
   `docs/runbook.md`, and tests that assert the expected storage source
-- prefer `docker compose up -d` for already-built local services; use
-  `docker compose up -d --build` only after Dockerfile, image dependency,
-  requirements, or compose changes, or when a rebuild is needed to pick up code
-  copied into an image
+- prefer Docker-based verification for API guardrails and services because the
+  built images contain the runtime dependency set used by the app
 
 ## Suggested Verification
 

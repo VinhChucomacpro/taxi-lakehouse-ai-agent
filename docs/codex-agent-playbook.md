@@ -47,8 +47,8 @@ the repo first.
   star schema. They are a fast/safe path for common questions, not a replacement
   for the star schema.
 - The current roadmap direction is controlled AI querying over the Gold star
-  schema, starting with semantic metadata and then column/table and join
-  guardrails.
+  schema. Semantic metadata, column/table guardrails, and join guardrails are
+  implemented; prompt planning and controlled fact/dim execution remain next.
 
 ## Session Closeout
 
@@ -83,6 +83,7 @@ behavior were checked.
 
 ## Docker Workflow
 
+- The project Docker images have already been built in the local environment.
 - Prefer `docker compose up -d` when images are already built.
 - Use `docker compose up -d --build` only when Dockerfiles, Compose config,
   `requirements.txt`, dependency installation, or image-copied source files
@@ -93,6 +94,11 @@ behavior were checked.
   or restarts.
 - Use targeted services when possible, for example `docker compose up -d api demo`
   for API/demo checks.
+- Prefer Docker-based API and guardrail verification because the `api` image has
+  runtime dependencies such as `sqlglot` and `duckdb`; the host Python
+  environment may skip dependency-gated tests.
+- Do not install dependencies into host Python solely to avoid skipped local
+  tests if the same check can be run in the already-built container.
 
 ## Layer Rules
 
@@ -142,6 +148,9 @@ a Gold aggregate mart can still be added as a fast path.
 - `execution_enabled` in the semantic catalog controls whether a cataloged Gold
   table is currently allowed in prompt generation and `/api/v1/query`.
 - `services/api/app/sql_guardrails.py` blocks unsafe SQL.
+- Guardrails currently validate table execution status, known columns, table
+  aliases, wildcard restrictions for detailed Gold tables, allowed join paths,
+  and query limits.
 - `services/api/app/text_to_sql.py` renders semantic metadata into the LLM prompt.
 - `services/api/app/catalog.py` loads catalog metadata for the API and prompt.
 - When exposing new tables to AI, add clear field descriptions.

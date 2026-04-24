@@ -131,32 +131,66 @@ Verification:
 
 Next step: Phase 7, Column And Table Guardrails.
 
-## Phase 7: Column And Table Guardrails
+## Phase 7A: Architecture Review And Thesis Cleanup
 
-Status: planned.
+Status: completed on 2026-04-24.
+
+Goal: make the project easier to defend by aligning README, architecture
+narrative, and the next optimization backlog with the implemented code.
+
+Completed:
+
+- Replaced the stale, mis-encoded README with a current Vietnamese overview.
+- Added `docs/architecture-review.md` to summarize architecture strengths,
+  known limitations, defense narrative, and next-phase backlog.
+- Clarified that MinIO is the Bronze source of truth, Gold contains star schema
+  plus aggregate marts, and AI execution currently remains limited to aggregate
+  marts.
+
+## Phase 7B: Column And Table Guardrails
+
+Status: completed on 2026-04-24.
 
 Goal: validate generated SQL against the semantic catalog at table and column
-level.
+level without widening the executable AI query surface.
 
-Required changes:
+Completed:
 
-- Validate referenced tables are cataloged.
-- Validate referenced columns are cataloged for the table or alias being used.
-- Reject unknown columns.
-- Reject `select * from fact_trips`.
-- Keep current rules: one statement only, `SELECT` only, no DML/DDL, no
-  Bronze/Silver, enforced `LIMIT`.
-- Add guardrail tests for unknown table, unknown column, `select * from
-  fact_trips`, and valid aggregate mart queries.
+- Kept current rules: one statement only, `SELECT` only, no DML/DDL, no
+  Bronze/Silver, execution-enabled table gating, and enforced `LIMIT`.
+- Validate referenced columns against cataloged fields, dimensions, metrics,
+  filters, and primary keys for the referenced Gold table or alias.
+- Reject unknown columns and unknown table aliases before DuckDB execution.
+- Reject wildcard `SELECT *` for detailed Gold tables such as `fact_trips`;
+  aggregate marts still allow wildcard queries for existing deterministic smoke
+  tests and demos.
+- Added guardrail tests for valid cataloged columns, unknown columns, unknown
+  aliases, disabled fact access, wildcard fact access, CTE usage, and valid
+  aggregate mart queries.
+
+Verification:
+
+- `python -m pytest -p no:cacheprovider` passed locally with `11 passed,
+  2 skipped`.
+- The skipped tests are dependency-gated in the host Python environment; Docker
+  is the preferred API/guardrail verification environment for this repo.
+- `docker compose up -d` started the already-built stack.
+- API container dependency check confirmed `sqlglot 30.6.0` and `duckdb 1.5.2`.
+- In-container guardrail smoke check accepted a valid `gold_daily_kpis` query
+  and rejected unknown column, disabled `fact_trips`, and `select * from
+  fact_trips` cases.
+- HTTP API smoke check returned rows for a valid `gold_daily_kpis` query and
+  HTTP `400` for an unknown-column query.
+- API health, Streamlit, and Airflow webserver responded locally.
 
 ## Phase 8: Join Guardrails For Star Schema
 
-Status: planned.
+Status: completed on 2026-04-24.
 
 Goal: allow AI to query fact/dim data only through approved star-schema join
 paths.
 
-Required changes:
+Completed:
 
 - Parse joins with `sqlglot`.
 - Require joins between `fact_trips` and dimensions to match cataloged allowed
@@ -166,6 +200,23 @@ Required changes:
   - pickup zone through `fact_trips.pickup_zone_id`
   - dropoff zone through `fact_trips.dropoff_zone_id`
 - Add tests for valid joins, invalid joins, missing `ON`, and cartesian joins.
+- Keep `fact_trips` and all `dim_*` tables `execution_enabled: false` in the
+  real semantic catalog until prompt planning and controlled exposure are ready.
+
+Verification:
+
+- Host-local syntax compile passed for `services/api/app/sql_guardrails.py` and
+  `tests/test_sql_guardrails.py`.
+- Host-local `python -m pytest -p no:cacheprovider` passed with `11 passed,
+  2 skipped`; the skipped tests are dependency-gated in host Python.
+- API-container guardrail smoke tests accepted valid joins for `dim_vendor`,
+  pickup `dim_zone`, and dropoff `dim_zone`.
+- API-container guardrail smoke tests rejected wrong join key, missing `ON`, and
+  `CROSS JOIN`.
+- `docker compose restart api` restarted the running API service.
+- HTTP smoke check after restart returned rows for a valid `gold_daily_kpis`
+  query and HTTP `400` for direct `fact_trips` access, confirming the real
+  semantic catalog still keeps fact/dim execution disabled.
 
 ## Phase 9: Text-to-SQL Planner For Star Schema
 

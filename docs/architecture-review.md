@@ -1,0 +1,108 @@
+# Architecture Review For Thesis Defense
+
+This review summarizes the current architecture and the optimization backlog for
+the next phases. It is written for thesis defense preparation: explain what is
+implemented, why the design is reasonable, and which limitations are known.
+
+## Current Architecture Assessment
+
+The current architecture is coherent for a local-first analytical lakehouse:
+
+- Airflow owns monthly orchestration and keeps partition semantics visible.
+- MinIO is the Bronze object-storage source of truth.
+- Local `data/` files are ingestion cache and development fallback only.
+- dbt owns `Bronze -> Silver -> Gold` transformations and data tests.
+- DuckDB is the local analytical warehouse for Gold serving.
+- FastAPI exposes read-only schema and query endpoints.
+- The AI layer is constrained by semantic metadata and SQL guardrails before
+  DuckDB execution.
+
+This shape is appropriate for the project goal because it separates ingestion,
+modeling, serving, and AI safety. It also keeps the stack explainable for a
+graduation project without adding unnecessary agent frameworks.
+
+## Design Strengths
+
+- The lakehouse story is clear: raw source files land in Bronze, Silver
+  standardizes Yellow and Green trips, and Gold serves analytics and AI.
+- Gold now has both a dimensional star schema and aggregate marts. This gives a
+  fast path for common questions while preserving a flexible analytical base.
+- `contracts/semantic_catalog.yaml` is an explicit AI-facing contract instead
+  of relying on table names alone.
+- `execution_enabled` separates cataloged tables from executable tables, so
+  `fact_trips` and dimensions can be documented before they are exposed.
+- DuckDB is opened in read-only mode and generated SQL is parsed with
+  `sqlglot`, which makes the AI query surface safer and easier to defend.
+- The scope is controlled: Yellow Taxi, Green Taxi, and Taxi Zone Lookup only.
+
+## Known Limitations
+
+- SQL guardrails validate tables, execution status, cataloged columns, and
+  approved semantic join paths. Star-schema execution should still remain
+  disabled until prompt planning and controlled fact/dim API exposure are ready.
+- The semantic catalog, dbt schema docs, and human documentation are separate
+  sources that can drift. A future consistency test should compare Gold model
+  names and catalog entries.
+- `fact_trips` currently has a clear grain but no explicit surrogate key. This
+  is acceptable for the current serving layer, but a `trip_key` should be
+  considered if lineage, row-level drilldown, or stronger uniqueness tests are
+  needed.
+- Gold models are configured as views. This is simple and transparent, but the
+  project should evaluate materializing large Gold objects if demo latency or
+  repeated queries become a problem.
+- The Airflow DAG has a `publish_metadata` placeholder. It should either publish
+  useful run metadata or be removed from the defense narrative.
+- Some API and guardrail tests can skip when optional dependencies are missing.
+  A defense verification environment should install the full project dependency
+  set and record non-skipped test results.
+
+## Defense Narrative
+
+Use this narrative when explaining the system:
+
+1. The platform first solves reliable local lakehouse ingestion and modeling.
+2. MinIO is the durable Bronze source of truth; local files are only cache.
+3. dbt makes transformation logic repeatable and testable.
+4. Gold has two serving surfaces: aggregate marts for safe common questions and
+   star schema for controlled flexible analysis.
+5. AI is intentionally constrained. It does not query Bronze or Silver, cannot
+   write data, and only executes SQL after semantic and syntactic validation.
+6. `fact_trips` and dimensions are cataloged but disabled until column and join
+   guardrails are complete. This is a deliberate safety decision.
+
+## Next Optimization Backlog
+
+Priority 1: Guardrail hardening
+
+- Keep table execution gating.
+- Validate referenced columns and aliases against the semantic catalog.
+- Reject wildcard access on detailed Gold tables.
+- Add guardrail tests for unknown table, unknown column, disabled fact access,
+  valid mart query, and CTE usage.
+
+Priority 2: Join guardrails
+
+- Enforce `allowed_joins` from the semantic catalog.
+- Reject cartesian joins, joins without `ON`, and joins on wrong keys.
+- Support both pickup and dropoff `dim_zone` roles.
+
+Status: implemented for guardrail validation; fact/dim execution remains
+disabled in the semantic catalog until the prompt planner and demo path are
+ready.
+
+Priority 3: Catalog and documentation consistency
+
+- Add tests to detect drift between dbt Gold models and semantic catalog tables.
+- Keep README, architecture docs, data contracts, and roadmap aligned after each
+  phase.
+- Decide whether `fact_trips` needs a surrogate key for stronger explanation and
+  testing.
+
+Priority 4: Demo and defense readiness
+
+- Use a stable demo flow: schema view, valid mart query, blocked unsafe query,
+  and blocked fact query before join guardrails.
+- Run full tests in an environment where `sqlglot`, `duckdb`, `httpx`, and API
+  dependencies are installed.
+- Record verification date, command output, caveats, and next step in
+  `docs/runbook.md`.

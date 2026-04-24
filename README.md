@@ -1,76 +1,51 @@
 # taxi-lakehouse-ai-agent
 
-Đây là repo đồ án xây dựng một nền tảng lakehouse local-first cho dữ liệu taxi
-NYC TLC, kèm AI agent read-only để hỏi dữ liệu Gold bằng ngôn ngữ tự nhiên.
+Repo đồ án xây dựng một nền tảng lakehouse local-first cho dữ liệu NYC TLC
+Taxi, kèm API AI query read-only để hỏi dữ liệu Gold bằng ngôn ngữ tự nhiên.
 
 ## Kiến Trúc
 
-- `MinIO` lưu dữ liệu Bronze dạng object storage.
+- `MinIO` là Bronze object-storage source of truth.
 - `Airflow` điều phối pipeline ingest và transform theo tháng.
 - `dbt` xây dựng các lớp `Bronze -> Silver -> Gold` và chạy data tests.
-- `DuckDB` lưu warehouse local để phục vụ phân tích, BI và AI query.
-- `FastAPI` cung cấp API health, schema và query read-only.
-- `OpenAI API` sinh SQL từ câu hỏi tự nhiên.
-- `sqlglot` kiểm tra SQL guardrails trước khi chạy.
-- `Streamlit` cung cấp giao diện demo AI agent và biểu đồ tự động.
-
-## Cấu Trúc Repo
-
-```text
-.
-|-- airflow/
-|   `-- dags/
-|-- contracts/
-|-- dbt/
-|   `-- models/
-|-- docs/
-|-- infra/
-|-- services/
-|   |-- api/
-|   `-- demo/
-|-- tests/
-`-- docker-compose.yml
-```
+- `DuckDB` lưu warehouse local tại `warehouse/analytics.duckdb`.
+- `FastAPI` cung cấp health, schema và query API read-only.
+- `OpenAI API` sinh SQL từ câu hỏi tự nhiên khi có `OPENAI_API_KEY`.
+- `sqlglot` kiểm tra SQL guardrails trước khi DuckDB thực thi.
+- `Streamlit` cung cấp demo UI cho schema, SQL test, guardrails và Ask AI.
 
 ## Phạm Vi Hiện Tại
 
-Đang tập trung vào MVP với:
+Đang tập trung MVP với:
 
 - `Yellow Taxi` monthly trip parquet
 - `Green Taxi` monthly trip parquet
 - `Taxi Zone Lookup` làm reference dataset
 - pipeline `Bronze -> Silver -> Gold`
-- API Text-to-SQL read-only trên Gold
-- demo UI bằng Streamlit
+- Gold star schema và aggregate marts
+- API Text-to-SQL read-only trên các Gold objects được bật trong semantic catalog
 
 Tạm thời chưa đưa vào scope:
 
-- `FHV`
-- `HVFHV`
+- `FHV`, `HVFHV`
 - streaming ingestion
-- agent có quyền ghi dữ liệu
-- auth/authorization production-grade
+- write-capable agents
+- multi-tenant auth hoặc production-grade access control
+- LangChain/LangGraph/Vanna hoặc agent framework khác
 
-## Chạy Local
+## Cấu Trúc Repo
 
-1. Copy `.env.example` thành `.env` và cập nhật secret nếu cần.
-2. Build và chạy stack:
-
-   ```bash
-   docker compose up --build
-   ```
-
-3. Mở các service:
-
-   - Airflow: `http://localhost:8080`
-   - MinIO Console: `http://localhost:9001`
-   - API docs: `http://localhost:8000/docs`
-   - Streamlit demo: `http://localhost:8501`
-
-Thông tin đăng nhập mặc định:
-
-- Airflow: `admin` / `admin`
-- MinIO: xem `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD` trong `.env`
+```text
+.
+|-- airflow/dags/          # Airflow DAG và ingestion/dbt helpers
+|-- contracts/             # Semantic catalog cho AI layer
+|-- dbt/models/            # Bronze, Silver, Gold dbt models
+|-- docs/                  # Kiến trúc, roadmap, runbook, data contracts
+|-- services/api/          # FastAPI query service
+|-- services/demo/         # Streamlit demo
+|-- tests/                 # Unit, guardrail, catalog, smoke tests
+`-- docker-compose.yml
+```
 
 ## Pipeline Dữ Liệu
 
@@ -79,48 +54,39 @@ Airflow DAG chính: `taxi_monthly_pipeline`.
 Luồng xử lý:
 
 1. Tạo manifest cho Yellow, Green và Taxi Zone Lookup.
-2. Download file từ TLC CDN vào local mirror dưới `data/`.
-3. Upload cùng object key vào bucket MinIO `taxi-lakehouse`.
-4. Chạy `dbt build` cho Bronze và Silver.
-5. Chạy `dbt build` cho Gold.
-6. DuckDB warehouse được lưu dưới `warehouse/analytics.duckdb`.
+2. Download source file vào local `data/` làm cache phát triển.
+3. Upload cùng object key vào MinIO bucket `taxi-lakehouse`.
+4. dbt Bronze đọc từ MinIO qua DuckDB `httpfs`.
+5. dbt chuẩn hóa Silver và xây Gold trong DuckDB.
+6. API và demo chỉ phục vụ dữ liệu Gold đã curated.
 
 Object MinIO kỳ vọng:
 
 ```text
-taxi-lakehouse/
-  bronze/yellow_taxi/year=YYYY/month=MM/yellow_tripdata_YYYY-MM.parquet
-  bronze/green_taxi/year=YYYY/month=MM/green_tripdata_YYYY-MM.parquet
-  reference/taxi_zone_lookup/taxi_zone_lookup.csv
+s3://taxi-lakehouse/bronze/yellow_taxi/year=YYYY/month=MM/yellow_tripdata_YYYY-MM.parquet
+s3://taxi-lakehouse/bronze/green_taxi/year=YYYY/month=MM/green_tripdata_YYYY-MM.parquet
+s3://taxi-lakehouse/reference/taxi_zone_lookup/taxi_zone_lookup.csv
 ```
 
 ## Mô Hình Dữ Liệu
 
-- `Bronze`: đọc raw parquet/csv từ local mirror tương ứng với object đã upload MinIO.
-- `Silver`: chuẩn hóa Yellow và Green về schema chung.
-- `Gold`: dimensional models và marts phục vụ BI, dashboard và AI agent.
+Gold hiện có star schema:
 
-Gold dimensional models hiện có:
-
+- `fact_trips`
 - `dim_date`
 - `dim_zone`
 - `dim_service_type`
-- `fact_trips`
+- `dim_vendor`
+- `dim_payment_type`
 
-Gold marts hiện có:
+Gold aggregate marts:
 
 - `gold_daily_kpis`
 - `gold_zone_demand`
 
-Định hướng hiện tại:
-
-- giữ các Gold marts tổng hợp để phục vụ dashboard và AI query ít rủi ro
-- `gold_daily_kpis` và `gold_zone_demand` đã build từ dimensional layer
-- chưa expose trực tiếp `fact_trips` cho AI cho tới khi semantic catalog có
-  metadata đầy đủ về grain, metric và join path an toàn
-
-Silver hiện filter các trip có `pickup_at` nằm ngoài tháng partition của source
-file để loại bỏ ngày bất thường.
+Aggregate marts là fast/safe path cho dashboard và câu hỏi AI phổ biến. Star
+schema là nền tảng phân tích linh hoạt hơn, nhưng `fact_trips` và `dim_*` chỉ
+được mở cho AI execution sau khi column guardrails và join guardrails hoàn tất.
 
 ## AI Query Agent
 
@@ -130,51 +96,43 @@ API chính:
 - `GET /api/v1/schema`
 - `POST /api/v1/query`
 
-Guardrails:
+Guardrails hiện tại:
 
-- chỉ cho `SELECT`
-- chặn DML/DDL
-- chỉ cho truy cập bảng Gold trong `contracts/semantic_catalog.yaml`
+- chỉ cho một câu lệnh `SELECT`
+- chặn DML, DDL và command statements
+- chỉ cho truy cập Gold objects có trong `contracts/semantic_catalog.yaml`
+- chỉ execute các bảng có `execution_enabled: true`
+- validate referenced columns theo semantic catalog
+- chặn wildcard `SELECT *` trên detailed Gold tables như `fact_trips`
 - ép `LIMIT <= max_rows`
-- chạy DuckDB ở chế độ read-only
+- chạy DuckDB bằng read-only connection
 
-`/api/v1/query` hỗ trợ hai chế độ:
+Hiện tại AI execution surface chỉ gồm:
 
-1. Truyền `question` để OpenAI sinh SQL.
-2. Truyền thêm `sql` để test deterministic và demo guardrails.
+- `gold_daily_kpis`
+- `gold_zone_demand`
 
-Ví dụ:
+`fact_trips` và `dim_*` đã có semantic metadata nhưng vẫn
+`execution_enabled: false` cho đến khi join guardrails được triển khai.
 
-```json
-{
-  "question": "Show daily trip counts by service type",
-  "max_rows": 10,
-  "sql": "select service_type, pickup_date, trip_count from gold_daily_kpis order by pickup_date, service_type"
-}
-```
+## Chạy Local
 
-## Streamlit Demo
+1. Copy `.env.example` thành `.env` và cập nhật secret nếu cần.
+2. Start stack đã build:
 
-Chạy riêng API và demo:
+   ```bash
+   docker compose up -d
+   ```
 
-```bash
-docker compose up --build api demo
-```
+   Dùng `docker compose up -d --build` khi Dockerfile, dependency, compose config
+   hoặc source được copy vào image thay đổi.
 
-Mở:
+3. Mở các service:
 
-```text
-http://localhost:8501
-```
-
-Demo hỗ trợ:
-
-- xem health/schema của API
-- hỏi AI bằng ngôn ngữ tự nhiên
-- chạy SQL override để test guardrails
-- xem SQL đã validate
-- tự động vẽ line/bar chart từ kết quả
-- cảnh báo kết quả rỗng, chạm limit, metric âm hoặc date range bất thường
+   - Airflow: `http://localhost:8080`
+   - MinIO Console: `http://localhost:9001`
+   - API docs: `http://localhost:8000/docs`
+   - Streamlit demo: `http://localhost:8501`
 
 ## Kiểm Thử
 
@@ -184,27 +142,30 @@ Chạy unit tests:
 python -m pytest -p no:cacheprovider
 ```
 
-Chạy dbt build trong Airflow container:
+Chạy dbt build trong Airflow scheduler container:
 
 ```bash
 docker compose exec airflow-scheduler python -c "import sys; sys.path.insert(0, '/opt/airflow/dags'); from lib.dbt_runner import run_dbt_build; run_dbt_build()"
 ```
 
-Trigger DAG với config tháng:
+Smoke test API bằng SQL override:
 
-```bash
-docker compose exec airflow-scheduler python -c "from airflow.api.common.trigger_dag import trigger_dag; trigger_dag(dag_id='taxi_monthly_pipeline', run_id='e2e_2024_01', conf={'year': 2024, 'month': 1})"
+```json
+{
+  "question": "Show daily trip counts by service type",
+  "max_rows": 10,
+  "sql": "select service_type, pickup_date, trip_count from gold_daily_kpis order by pickup_date, service_type"
+}
 ```
 
-Trạng thái verify MVP gần nhất được ghi trong `docs/runbook.md`, mục
-`Last Verified MVP State`.
+Trạng thái verify và caveats gần nhất nằm trong `docs/runbook.md`.
 
 ## Tài Liệu Thêm
 
-- `AGENTS.md`: hướng dẫn cho coding agents
 - `docs/architecture.md`: kiến trúc tổng quan
+- `docs/architecture-review.md`: rà soát kiến trúc, tradeoff và backlog bảo vệ
 - `docs/data-contracts.md`: hợp đồng dữ liệu
-- `docs/development-roadmap.md`: hướng phát triển theo giai đoạn
-- `docs/modeling-decisions.md`: quyết định mô hình dữ liệu và định hướng dim/fact
-- `docs/source-notes.md`: ghi chú nguồn dữ liệu
-- `docs/runbook.md`: hướng dẫn vận hành local
+- `docs/development-roadmap.md`: roadmap theo phase
+- `docs/gold-star-schema.md`: cấu trúc Gold star schema
+- `docs/modeling-decisions.md`: quyết định mô hình dữ liệu
+- `docs/runbook.md`: hướng dẫn vận hành local và verification

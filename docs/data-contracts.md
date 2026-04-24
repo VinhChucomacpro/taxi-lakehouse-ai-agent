@@ -84,5 +84,11 @@ Rules:
 - The API may only execute `SELECT` statements.
 - SQL must reference at least one curated Gold table from `contracts/semantic_catalog.yaml`.
 - References to Bronze, Silver, system tables, external files, DML, and DDL are rejected.
+- Referenced columns must be present in the semantic catalog for the referenced
+  Gold table or table alias.
+- Wildcard `SELECT *` is allowed for aggregate marts, but is rejected for
+  detailed Gold tables such as `fact_trips`.
+- Joins must use explicit `ON` conditions and match an allowed join path from
+  the semantic catalog. Cartesian joins and `CROSS JOIN` are rejected.
 - The API enforces the caller's `max_rows` limit before execution.
 - DuckDB is opened in read-only mode for query execution.

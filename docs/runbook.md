@@ -3,7 +3,7 @@
 ## Local Setup
 
 1. Review `.env`
-2. Start already-built services with:
+2. Start the already-built Docker services with:
 
    ```bash
    docker compose up -d
@@ -18,6 +18,16 @@
    - MinIO Console at `http://localhost:9001`
    - API docs at `http://localhost:8000/docs`
    - Streamlit demo at `http://localhost:8501`
+
+## Current Docker Environment
+
+- The local Docker images for Airflow, API, and demo have already been built.
+- Prefer `docker compose up -d` for normal startup.
+- Use `docker compose up -d --build` only when Dockerfiles, Compose config,
+  requirements, dependency installation, or image-copied source files changed.
+- Prefer Docker-based API and SQL guardrail checks because the `api` container
+  has runtime dependencies such as `sqlglot` and `duckdb`; the host Python
+  environment may not.
 
 ## Expected Local Volumes
 
@@ -193,6 +203,78 @@ Notes:
   contract.
 - Aggregate marts remain the only current AI-executable Gold surface.
 
+## Last Verified Architecture Review And Guardrail State
+
+Last architecture review and guardrail verification: `2026-04-24`.
+
+Implemented behavior:
+
+- README was refreshed with correct Vietnamese text and current project state.
+- `docs/architecture-review.md` was added for thesis-defense architecture
+  narrative, known limitations, and next optimization backlog.
+- SQL guardrails now validate cataloged columns and table aliases before DuckDB
+  execution.
+- Wildcard `SELECT *` is rejected for detailed Gold tables such as
+  `fact_trips`, while aggregate marts retain wildcard support for existing
+  deterministic demo/smoke paths.
+
+Verification:
+
+- `docker compose up -d` started the already-built stack.
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- API container dependency check reported `sqlglot 30.6.0` and `duckdb 1.5.2`.
+- In-container guardrail smoke check:
+  - valid `gold_daily_kpis` query was accepted and limited
+  - unknown column query was rejected
+  - explicit `fact_trips` query was rejected because it is not execution-enabled
+  - `select * from fact_trips` was rejected by wildcard policy
+- HTTP API smoke check returned 5 rows for a valid `gold_daily_kpis` query and
+  HTTP `400` for an unknown-column query.
+- Local API health returned `status=ok` and `semantic_catalog_loaded=True`.
+- Streamlit demo returned HTTP `200`.
+- Airflow webserver returned HTTP `200`.
+- Host-local `python -m pytest -p no:cacheprovider` passed with `11 passed,
+  2 skipped`; the skipped tests are dependency-gated in the host Python
+  environment, so Docker remains the preferred verification environment for
+  API/guardrail behavior.
+
+## Last Verified Join Guardrail State
+
+Last join guardrail verification: `2026-04-24`.
+
+Implemented behavior:
+
+- SQL guardrails now parse joins with `sqlglot`.
+- Joins must include explicit `ON` conditions.
+- Cartesian joins and `CROSS JOIN` are rejected.
+- Join predicates must match semantic catalog `allowed_joins`.
+- Pickup and dropoff `dim_zone` roles are both supported through their approved
+  fact keys.
+- The real semantic catalog still keeps `fact_trips` and all `dim_*` tables
+  `execution_enabled: false`; Phase 8 validates the policy before controlled
+  exposure.
+
+Verification:
+
+- Host-local syntax compile passed for `services/api/app/sql_guardrails.py` and
+  `tests/test_sql_guardrails.py`.
+- Host-local `python -m pytest -p no:cacheprovider` passed with `11 passed,
+  2 skipped`; Docker remains the preferred environment for SQL guardrail tests.
+- `docker compose restart api` restarted the running API service so HTTP traffic
+  uses the updated guardrail code.
+- API-container smoke tests accepted valid joins:
+  - `fact_trips.vendor_id = dim_vendor.vendor_id`
+  - `fact_trips.pickup_zone_id = dim_zone.zone_id`
+  - `fact_trips.dropoff_zone_id = dim_zone.zone_id`
+- API-container smoke tests rejected:
+  - wrong join key
+  - join without `ON`
+  - `CROSS JOIN`
+- HTTP smoke check after API restart returned rows for a valid
+  `gold_daily_kpis` query and HTTP `400` for direct `fact_trips` access,
+  confirming fact/dim execution remains disabled.
+
 ## AI Query Checks
 
 Use `/api/v1/schema` to confirm the semantic catalog before querying.
@@ -206,6 +288,11 @@ The semantic catalog includes table type, execution flag, grain, dimensions,
 metrics, allowed filters, keys, and join metadata. `fact_trips` and Gold
 dimensions are intentionally cataloged but not execution-enabled yet, so they
 do not appear in the current Text-to-SQL execution surface.
+
+Current SQL guardrails also validate referenced columns and table aliases
+against the semantic catalog before execution. Detailed Gold tables such as
+`fact_trips` reject wildcard `SELECT *`. Joins must match cataloged
+`allowed_joins`; missing-`ON` and cartesian joins are rejected.
 
 For deterministic guardrail testing, `/api/v1/query` accepts an optional `sql`
 field. When `sql` is omitted, the API uses OpenAI to generate SQL from the

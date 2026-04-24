@@ -14,15 +14,32 @@ class SchemaField(BaseModel):
     description: str
 
 
+class SchemaForeignKey(BaseModel):
+    column: str
+    references_table: str
+    references_column: str
+
+
+class SchemaJoin(BaseModel):
+    left_table: str
+    left_column: str
+    right_table: str
+    right_column: str
+
+
 class SchemaTable(BaseModel):
     name: str
     description: str
     table_type: str = "aggregate_mart"
+    execution_enabled: bool = False
     grain: str = ""
     fields: list[SchemaField] = Field(default_factory=list)
     dimensions: list[str] = Field(default_factory=list)
     metrics: list[SchemaField] = Field(default_factory=list)
     allowed_filters: list[str] = Field(default_factory=list)
+    primary_key: list[str] = Field(default_factory=list)
+    foreign_keys: list[SchemaForeignKey] = Field(default_factory=list)
+    allowed_joins: list[SchemaJoin] = Field(default_factory=list)
     preferred_questions: list[str] = Field(default_factory=list)
 
 

@@ -31,7 +31,8 @@ def validate_gold_select(sql: str, catalog: SchemaResponse, max_rows: int) -> Va
     if any(expression.find(forbidden_type) for forbidden_type in forbidden):
         raise SQLValidationError("DML, DDL, and command statements are not allowed.")
 
-    allowed_tables = {table.name for table in catalog.tables}
+    cataloged_tables = {table.name for table in catalog.tables}
+    execution_enabled_tables = {table.name for table in catalog.tables if table.execution_enabled}
     cte_names = {cte.alias for cte in expression.find_all(exp.CTE) if cte.alias}
     referenced_tables = {
         table.name
@@ -42,10 +43,17 @@ def validate_gold_select(sql: str, catalog: SchemaResponse, max_rows: int) -> Va
     if not referenced_tables:
         raise SQLValidationError("Query must reference at least one curated Gold table.")
 
-    disallowed_tables = referenced_tables - allowed_tables
+    disallowed_tables = referenced_tables - cataloged_tables
     if disallowed_tables:
         disallowed = ", ".join(sorted(disallowed_tables))
         raise SQLValidationError(f"Query references non-Gold or unknown tables: {disallowed}.")
+
+    disabled_tables = referenced_tables - execution_enabled_tables
+    if disabled_tables:
+        disabled = ", ".join(sorted(disabled_tables))
+        raise SQLValidationError(
+            f"Query references curated Gold tables that are cataloged but not execution-enabled: {disabled}."
+        )
 
     _apply_limit(expression, max_rows)
     return ValidatedSQL(sql=expression.sql(dialect="duckdb"), tables=referenced_tables)

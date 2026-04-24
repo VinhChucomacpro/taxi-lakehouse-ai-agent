@@ -17,12 +17,20 @@ def catalog() -> SchemaResponse:
             SchemaTable(
                 name="gold_daily_kpis",
                 description="Daily KPIs",
+                execution_enabled=True,
                 fields=[SchemaField(name="pickup_date", description="Pickup date")],
             ),
             SchemaTable(
                 name="gold_zone_demand",
                 description="Zone demand",
+                execution_enabled=True,
                 fields=[SchemaField(name="zone_id", description="Zone ID")],
+            ),
+            SchemaTable(
+                name="fact_trips",
+                description="Trip fact",
+                execution_enabled=False,
+                fields=[SchemaField(name="pickup_date", description="Pickup date")],
             ),
         ]
     )
@@ -44,6 +52,11 @@ def test_validate_gold_select_caps_existing_limit() -> None:
 def test_validate_gold_select_rejects_non_gold_table() -> None:
     with pytest.raises(SQLValidationError, match="non-Gold"):
         validate_gold_select("select * from silver_trips_unified", catalog(), max_rows=100)
+
+
+def test_validate_gold_select_rejects_cataloged_but_disabled_table() -> None:
+    with pytest.raises(SQLValidationError, match="not execution-enabled"):
+        validate_gold_select("select * from fact_trips", catalog(), max_rows=100)
 
 
 def test_validate_gold_select_rejects_ddl() -> None:

@@ -65,6 +65,11 @@ type, pickup zone, and dropoff zone. It does not replace aggregate marts.
 ## AI Query Direction
 
 - AI may query only Gold objects listed in the semantic catalog.
+- The semantic catalog now distinguishes between cataloged Gold objects and
+  execution-enabled Gold objects.
+- `gold_daily_kpis` and `gold_zone_demand` remain execution-enabled.
+- `fact_trips` and the `dim_*` tables are now cataloged with full metadata, but
+  remain execution-disabled until column and join guardrails are implemented.
 - Prefer aggregate marts for simple common questions.
 - Use controlled star-schema querying for vendor, payment type, pickup/dropoff
   role, and flexible fact/dim analysis after semantic metadata and join

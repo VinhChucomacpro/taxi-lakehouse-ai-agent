@@ -102,26 +102,34 @@ Next step: Phase 6, Star Schema Semantic Catalog.
 
 ## Phase 6: Star Schema Semantic Catalog
 
-Status: next.
+Status: completed on 2026-04-24.
 
 Goal: extend `contracts/semantic_catalog.yaml` so it describes the full Gold
 star schema, not only aggregate marts.
 
-Required changes:
+Completed:
 
 - Add catalog entries for `fact_trips`, `dim_date`, `dim_zone`,
   `dim_service_type`, `dim_vendor`, and `dim_payment_type`.
 - For each table, describe `table_type`, `grain`, `fields`, `metrics`,
-  `primary_key`, `foreign_keys`, and `allowed_filters` where applicable.
-- For `fact_trips`, describe allowed joins:
-  - `fact_trips.pickup_date = dim_date.pickup_date`
-  - `fact_trips.service_type = dim_service_type.service_type`
-  - `fact_trips.vendor_id = dim_vendor.vendor_id`
-  - `fact_trips.payment_type = dim_payment_type.payment_type`
-  - `fact_trips.pickup_zone_id = dim_zone.zone_id`
-  - `fact_trips.dropoff_zone_id = dim_zone.zone_id`
-- Update semantic catalog tests and prompt rendering tests.
-- Update this roadmap and `docs/runbook.md` after verification.
+  `primary_key`, `foreign_keys`, `allowed_joins`, and `allowed_filters` where
+  applicable.
+- Keep `gold_daily_kpis` and `gold_zone_demand` as the only
+  `execution_enabled: true` tables.
+- Add `execution_enabled: false` for `fact_trips` and all `dim_*` tables so the
+  full star schema is cataloged without widening the current query surface.
+- Update API schema models, catalog loading, prompt rendering, semantic catalog
+  tests, SQL guardrail tests, and API smoke tests to support execution gating
+  and richer metadata.
+
+Verification:
+
+- `python -m pytest -p no:cacheprovider tests/test_semantic_catalog.py` passed.
+- `tests/test_sql_guardrails.py` and `tests/test_api_smoke.py` remain present
+  and were updated for Phase 6 behavior, but they still skip in environments
+  missing optional dependencies such as `sqlglot`, `duckdb`, or `httpx`.
+
+Next step: Phase 7, Column And Table Guardrails.
 
 ## Phase 7: Column And Table Guardrails
 

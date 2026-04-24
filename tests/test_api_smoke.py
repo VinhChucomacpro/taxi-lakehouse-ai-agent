@@ -19,6 +19,9 @@ def build_test_client(tmp_path, monkeypatch) -> TestClient:
 tables:
   - name: gold_daily_kpis
     description: Daily KPIs
+    table_type: aggregate_mart
+    execution_enabled: true
+    grain: One row per service_type and pickup_date.
     fields:
       - name: service_type
         description: Taxi service type.
@@ -26,6 +29,42 @@ tables:
         description: Pickup date.
       - name: trip_count
         description: Trip count.
+    dimensions:
+      - service_type
+      - pickup_date
+    metrics:
+      - name: trip_count
+        description: Trip count.
+    allowed_filters:
+      - service_type
+      - pickup_date
+      - trip_count
+    primary_key:
+      - service_type
+      - pickup_date
+    foreign_keys: []
+    allowed_joins: []
+  - name: fact_trips
+    description: Trip fact
+    table_type: fact
+    execution_enabled: false
+    grain: One row per trip.
+    fields:
+      - name: pickup_date
+        description: Pickup date.
+      - name: trip_distance
+        description: Trip distance.
+    dimensions:
+      - pickup_date
+    metrics:
+      - name: trip_distance
+        description: Trip distance.
+    allowed_filters:
+      - pickup_date
+      - trip_distance
+    primary_key: []
+    foreign_keys: []
+    allowed_joins: []
 """.strip(),
         encoding="utf-8",
     )
@@ -81,6 +120,22 @@ def test_query_endpoint_allows_gold_select_with_sql_override(tmp_path, monkeypat
     assert payload["sql"].endswith("LIMIT 10")
 
 
+def test_schema_endpoint_returns_full_catalog_metadata(tmp_path, monkeypatch) -> None:
+    client = build_test_client(tmp_path, monkeypatch)
+
+    response = client.get("/api/v1/schema")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert {table["name"] for table in payload["tables"]} == {"gold_daily_kpis", "fact_trips"}
+    mart = next(table for table in payload["tables"] if table["name"] == "gold_daily_kpis")
+    fact = next(table for table in payload["tables"] if table["name"] == "fact_trips")
+    assert mart["execution_enabled"] is True
+    assert mart["primary_key"] == ["service_type", "pickup_date"]
+    assert fact["execution_enabled"] is False
+    assert fact["allowed_joins"] == []
+
+
 def test_query_endpoint_rejects_non_gold_sql(tmp_path, monkeypatch) -> None:
     client = build_test_client(tmp_path, monkeypatch)
 
@@ -95,6 +150,22 @@ def test_query_endpoint_rejects_non_gold_sql(tmp_path, monkeypatch) -> None:
 
     assert response.status_code == 400
     assert "non-Gold" in response.json()["detail"]
+
+
+def test_query_endpoint_rejects_disabled_fact_sql(tmp_path, monkeypatch) -> None:
+    client = build_test_client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/api/v1/query",
+        json={
+            "question": "Show trip facts",
+            "max_rows": 10,
+            "sql": "select * from fact_trips",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "not execution-enabled" in response.json()["detail"]
 
 
 def test_query_endpoint_rejects_ddl(tmp_path, monkeypatch) -> None:

@@ -17,30 +17,61 @@ def test_semantic_catalog_has_tables() -> None:
     assert payload["tables"]
 
 
-def test_semantic_catalog_describes_ai_serving_marts() -> None:
+def test_semantic_catalog_describes_gold_star_schema_and_execution_surface() -> None:
     catalog_path = Path("contracts/semantic_catalog.yaml")
     payload = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
 
     table_names = {table["name"] for table in payload["tables"]}
-    assert table_names == {"gold_daily_kpis", "gold_zone_demand"}
-    assert "fact_trips" not in table_names
+    assert table_names == {
+        "gold_daily_kpis",
+        "gold_zone_demand",
+        "fact_trips",
+        "dim_date",
+        "dim_zone",
+        "dim_service_type",
+        "dim_vendor",
+        "dim_payment_type",
+    }
+
+    execution_enabled_tables = {
+        table["name"] for table in payload["tables"] if table.get("execution_enabled")
+    }
+    assert execution_enabled_tables == {"gold_daily_kpis", "gold_zone_demand"}
+
+    table_by_name = {table["name"]: table for table in payload["tables"]}
 
     for table in payload["tables"]:
-        assert table["table_type"] == "aggregate_mart"
         assert table["grain"]
         assert table["fields"]
-        assert table["dimensions"]
-        assert table["metrics"]
         assert table["allowed_filters"]
-        assert table["preferred_questions"]
+        assert "primary_key" in table
+        assert "foreign_keys" in table
+        assert "allowed_joins" in table
+        assert table["dimensions"] is not None
+        assert table["metrics"] is not None
+
+    assert table_by_name["gold_daily_kpis"]["table_type"] == "aggregate_mart"
+    assert table_by_name["fact_trips"]["table_type"] == "fact"
+    assert table_by_name["dim_zone"]["table_type"] == "dimension"
+    assert table_by_name["fact_trips"]["primary_key"] == []
+    assert len(table_by_name["fact_trips"]["foreign_keys"]) == 6
+    assert len(table_by_name["fact_trips"]["allowed_joins"]) == 6
+    assert len(table_by_name["fact_trips"]["metrics"]) == 4
+    assert table_by_name["dim_date"]["primary_key"] == ["pickup_date"]
 
 
 def test_catalog_loader_and_prompt_include_semantic_metadata() -> None:
     catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
     rendered = render_catalog_for_prompt(catalog)
 
-    assert catalog.tables[0].grain
-    assert catalog.tables[0].metrics
+    assert len(catalog.tables) == 8
+    assert sum(1 for table in catalog.tables if table.execution_enabled) == 2
+    fact_trips = next(table for table in catalog.tables if table.name == "fact_trips")
+    assert len(fact_trips.foreign_keys) == 6
+    assert len(fact_trips.allowed_joins) == 6
     assert "Grain:" in rendered
     assert "Metric: trip_count" in rendered
     assert "Allowed filters:" in rendered
+    assert "Primary key: service_type, pickup_date" in rendered
+    assert "Execution enabled: true" in rendered
+    assert "fact_trips" not in rendered

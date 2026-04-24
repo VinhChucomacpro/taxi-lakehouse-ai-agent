@@ -12,6 +12,32 @@ story: lakehouse first, read-only AI agent on top.
 5. `docs/runbook.md` for Airflow, dbt, operations, and verification.
 6. `contracts/semantic_catalog.yaml` before any AI query or guardrail work.
 
+## Quick File Reference
+
+Use this table to go directly to the likely source of truth instead of scanning
+the repo first.
+
+| Task or question | Primary file(s) | Notes |
+| --- | --- | --- |
+| project scope, allowed sources, architecture constraints | `AGENTS.md` | Read first before major changes |
+| current roadmap phase and next step | `docs/development-roadmap.md` | Phase status only, not detailed schema |
+| modeling decisions and why the current approach exists | `docs/modeling-decisions.md` | Use before changing Gold design |
+| detailed Gold star schema columns, grain, join paths | `docs/gold-star-schema.md` | Canonical doc for dim/fact structure |
+| operational commands, dbt build flow, Docker and MinIO run steps | `docs/runbook.md` | Source of truth for verification commands |
+| Bronze, Silver, Gold model tests and docs metadata | `dbt/models/schema.yml` | Update in the same change as model edits |
+| Gold dim/fact SQL models | `dbt/models/gold/` | Includes `fact_trips`, `dim_*`, and marts |
+| ingestion DAG orchestration | `airflow/dags/` | Use for schedule and pipeline flow changes |
+| ingestion implementation and tests | `tests/test_tlc_ingestion.py` | Start here for ingestion regressions |
+| AI-visible semantic metadata | `contracts/semantic_catalog.yaml` | Required before exposing new AI-queryable tables |
+| SQL safety and query restrictions | `services/api/app/sql_guardrails.py` | Main guardrail logic |
+| semantic catalog loading in API | `services/api/app/catalog.py` | Reads and validates catalog for app usage |
+| prompt assembly for Text-to-SQL | `services/api/app/text_to_sql.py` | Main LLM prompt rendering path |
+| API entrypoints and query execution path | `services/api/app/` | Inspect alongside guardrails and catalog |
+| SQL guardrail tests | `tests/test_sql_guardrails.py` | Update when SQL policy changes |
+| semantic catalog tests | `tests/test_semantic_catalog.py` | Update when catalog shape or validation changes |
+| API smoke tests | `tests/test_api_smoke.py` | Use for end-to-end query behavior checks |
+| repo-specific agent workflow guidance | `docs/codex-agent-playbook.md` | Update when agent workflow changes |
+
 ## Current Project State
 
 - Gold star schema is implemented for the MVP.
@@ -113,6 +139,8 @@ a Gold aggregate mart can still be added as a fast path.
 ## AI Query Layer
 
 - `contracts/semantic_catalog.yaml` is the AI-visible Gold catalog.
+- `execution_enabled` in the semantic catalog controls whether a cataloged Gold
+  table is currently allowed in prompt generation and `/api/v1/query`.
 - `services/api/app/sql_guardrails.py` blocks unsafe SQL.
 - `services/api/app/text_to_sql.py` renders semantic metadata into the LLM prompt.
 - `services/api/app/catalog.py` loads catalog metadata for the API and prompt.

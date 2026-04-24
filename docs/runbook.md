@@ -162,6 +162,37 @@ Verification for this update:
 - The dbt `on-run-start` hook `configure_minio_access` completed successfully,
   confirming DuckDB could configure `httpfs`/S3 access before Bronze model reads.
 
+## Last Verified Semantic Catalog State
+
+Last semantic catalog verification: `2026-04-24`.
+
+Implemented behavior:
+
+- `contracts/semantic_catalog.yaml` now describes all Gold aggregate marts,
+  dimensions, and the `fact_trips` table.
+- The catalog now includes `execution_enabled`, `primary_key`,
+  `foreign_keys`, and `allowed_joins` metadata.
+- `/api/v1/schema` returns the full Gold catalog, including cataloged but
+  execution-disabled tables.
+- `/api/v1/query` and Text-to-SQL prompt rendering now use only
+  `execution_enabled: true` tables, so `fact_trips` and `dim_*` remain blocked
+  until later guardrail phases.
+
+Verification for this update:
+
+- `python -m pytest -p no:cacheprovider tests/test_semantic_catalog.py` passed
+  with `3 passed`.
+- `python -m pytest -p no:cacheprovider tests/test_sql_guardrails.py` skipped in
+  the current environment because `sqlglot` is unavailable.
+- `python -m pytest -p no:cacheprovider tests/test_api_smoke.py` skipped in the
+  current environment because optional API test dependencies are unavailable.
+
+Notes:
+
+- The semantic catalog is now both metadata contract and execution-gating
+  contract.
+- Aggregate marts remain the only current AI-executable Gold surface.
+
 ## AI Query Checks
 
 Use `/api/v1/schema` to confirm the semantic catalog before querying.
@@ -171,9 +202,10 @@ Current AI-visible Gold tables:
 - `gold_daily_kpis`
 - `gold_zone_demand`
 
-The semantic catalog includes table type, grain, dimensions, metrics, allowed
-filters, and preferred question patterns for these aggregate marts. `fact_trips`
-and Gold dimensions are intentionally not exposed directly to the AI layer.
+The semantic catalog includes table type, execution flag, grain, dimensions,
+metrics, allowed filters, keys, and join metadata. `fact_trips` and Gold
+dimensions are intentionally cataloged but not execution-enabled yet, so they
+do not appear in the current Text-to-SQL execution surface.
 
 For deterministic guardrail testing, `/api/v1/query` accepts an optional `sql`
 field. When `sql` is omitted, the API uses OpenAI to generate SQL from the

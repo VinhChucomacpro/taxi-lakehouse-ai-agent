@@ -2,6 +2,7 @@ tables:
   - name: gold_daily_kpis
     description: Daily aggregate KPIs for Yellow Taxi and Green Taxi trips.
     table_type: aggregate_mart
+    execution_enabled: true
     grain: One row per service type and pickup date.
     fields:
       - name: service_type
@@ -27,13 +28,23 @@ tables:
     allowed_filters:
       - service_type
       - pickup_date
+      - trip_count
+      - total_fare_amount
+      - avg_trip_distance
+    primary_key:
+      - service_type
+      - pickup_date
+    foreign_keys: []
+    allowed_joins: []
     preferred_questions:
       - Daily trip volume by taxi service.
       - Daily fare totals by taxi service.
       - Average trip distance trends by taxi service.
+
   - name: gold_zone_demand
     description: Aggregated demand metrics by pickup taxi zone for Yellow and Green Taxi.
     table_type: aggregate_mart
+    execution_enabled: true
     grain: One row per service type, pickup date, and pickup taxi zone.
     fields:
       - name: service_type
@@ -67,7 +78,285 @@ tables:
       - zone_id
       - borough
       - zone_name
+      - trip_count
+      - total_amount
+    primary_key:
+      - service_type
+      - pickup_date
+      - zone_id
+    foreign_keys: []
+    allowed_joins: []
     preferred_questions:
       - Pickup demand by taxi zone.
       - Top pickup zones by trip count.
       - Zone revenue by service type and day.
+
+  - name: fact_trips
+    description: Trip-level Gold fact table built from valid Silver trips.
+    table_type: fact
+    execution_enabled: false
+    grain: One row per valid trip from silver_trips_unified.
+    fields:
+      - name: service_type
+        description: Taxi service identifier for the trip.
+      - name: source_year
+        description: Source file partition year retained for lineage.
+      - name: source_month
+        description: Source file partition month retained for lineage.
+      - name: pickup_date
+        description: Calendar date of the pickup timestamp.
+      - name: pickup_at
+        description: Pickup timestamp.
+      - name: dropoff_at
+        description: Dropoff timestamp.
+      - name: vendor_id
+        description: TLC vendor code associated with the trip.
+      - name: pickup_zone_id
+        description: Pickup taxi zone identifier.
+      - name: dropoff_zone_id
+        description: Dropoff taxi zone identifier.
+      - name: passenger_count
+        description: Passenger count recorded on the trip.
+      - name: trip_distance
+        description: Distance traveled during the trip.
+      - name: fare_amount
+        description: Base fare amount for the trip.
+      - name: total_amount
+        description: Total trip amount.
+      - name: payment_type
+        description: TLC payment type code associated with the trip.
+    dimensions:
+      - service_type
+      - source_year
+      - source_month
+      - pickup_date
+      - pickup_at
+      - dropoff_at
+      - vendor_id
+      - pickup_zone_id
+      - dropoff_zone_id
+      - payment_type
+    metrics:
+      - name: passenger_count
+        description: Passenger count measure at trip grain.
+      - name: trip_distance
+        description: Trip distance measure at trip grain.
+      - name: fare_amount
+        description: Base fare amount measure at trip grain.
+      - name: total_amount
+        description: Total amount measure at trip grain.
+    allowed_filters:
+      - service_type
+      - source_year
+      - source_month
+      - pickup_date
+      - pickup_at
+      - dropoff_at
+      - vendor_id
+      - pickup_zone_id
+      - dropoff_zone_id
+      - passenger_count
+      - trip_distance
+      - fare_amount
+      - total_amount
+      - payment_type
+    primary_key: []
+    foreign_keys:
+      - column: pickup_date
+        references_table: dim_date
+        references_column: pickup_date
+      - column: service_type
+        references_table: dim_service_type
+        references_column: service_type
+      - column: vendor_id
+        references_table: dim_vendor
+        references_column: vendor_id
+      - column: payment_type
+        references_table: dim_payment_type
+        references_column: payment_type
+      - column: pickup_zone_id
+        references_table: dim_zone
+        references_column: zone_id
+      - column: dropoff_zone_id
+        references_table: dim_zone
+        references_column: zone_id
+    allowed_joins:
+      - left_table: fact_trips
+        left_column: pickup_date
+        right_table: dim_date
+        right_column: pickup_date
+      - left_table: fact_trips
+        left_column: service_type
+        right_table: dim_service_type
+        right_column: service_type
+      - left_table: fact_trips
+        left_column: vendor_id
+        right_table: dim_vendor
+        right_column: vendor_id
+      - left_table: fact_trips
+        left_column: payment_type
+        right_table: dim_payment_type
+        right_column: payment_type
+      - left_table: fact_trips
+        left_column: pickup_zone_id
+        right_table: dim_zone
+        right_column: zone_id
+      - left_table: fact_trips
+        left_column: dropoff_zone_id
+        right_table: dim_zone
+        right_column: zone_id
+    preferred_questions:
+      - Trip-level analysis after star-schema guardrails are enabled.
+      - Vendor and payment type analysis after controlled fact access is enabled.
+
+  - name: dim_date
+    description: Date dimension derived from valid Silver pickup dates.
+    table_type: dimension
+    execution_enabled: false
+    grain: One row per pickup_date.
+    fields:
+      - name: pickup_date
+        description: Calendar date used as the date key.
+      - name: year
+        description: Calendar year extracted from pickup_date.
+      - name: quarter
+        description: Calendar quarter extracted from pickup_date.
+      - name: month
+        description: Calendar month extracted from pickup_date.
+      - name: day
+        description: Day of month extracted from pickup_date.
+      - name: day_name
+        description: Human-readable weekday name for pickup_date.
+      - name: day_of_week
+        description: Numeric weekday extracted from pickup_date.
+      - name: year_month
+        description: Year-month label derived from pickup_date.
+    dimensions:
+      - pickup_date
+      - year
+      - quarter
+      - month
+      - day
+      - day_name
+      - day_of_week
+      - year_month
+    metrics: []
+    allowed_filters:
+      - pickup_date
+      - year
+      - quarter
+      - month
+      - day
+      - day_name
+      - day_of_week
+      - year_month
+    primary_key:
+      - pickup_date
+    foreign_keys: []
+    allowed_joins: []
+    preferred_questions:
+      - Calendar slicing and grouping after star-schema guardrails are enabled.
+
+  - name: dim_zone
+    description: Taxi zone dimension sourced from the TLC Taxi Zone Lookup reference file.
+    table_type: dimension
+    execution_enabled: false
+    grain: One row per zone_id.
+    fields:
+      - name: zone_id
+        description: Taxi zone identifier.
+      - name: borough
+        description: Borough associated with the taxi zone.
+      - name: zone_name
+        description: Human-readable taxi zone name.
+      - name: service_zone
+        description: TLC service zone classification.
+    dimensions:
+      - zone_id
+      - borough
+      - zone_name
+      - service_zone
+    metrics: []
+    allowed_filters:
+      - zone_id
+      - borough
+      - zone_name
+      - service_zone
+    primary_key:
+      - zone_id
+    foreign_keys: []
+    allowed_joins: []
+    preferred_questions:
+      - Pickup and dropoff zone enrichment after star-schema guardrails are enabled.
+
+  - name: dim_service_type
+    description: Service type dimension for taxi services included in the MVP.
+    table_type: dimension
+    execution_enabled: false
+    grain: One row per service_type.
+    fields:
+      - name: service_type
+        description: Taxi service identifier.
+      - name: service_type_name
+        description: Human-readable taxi service name.
+    dimensions:
+      - service_type
+      - service_type_name
+    metrics: []
+    allowed_filters:
+      - service_type
+      - service_type_name
+    primary_key:
+      - service_type
+    foreign_keys: []
+    allowed_joins: []
+    preferred_questions:
+      - Service type labeling after star-schema guardrails are enabled.
+
+  - name: dim_vendor
+    description: Vendor dimension mapping TLC vendor codes to provider names.
+    table_type: dimension
+    execution_enabled: false
+    grain: One row per vendor_id.
+    fields:
+      - name: vendor_id
+        description: TLC vendor code.
+      - name: vendor_name
+        description: Human-readable vendor name.
+    dimensions:
+      - vendor_id
+      - vendor_name
+    metrics: []
+    allowed_filters:
+      - vendor_id
+      - vendor_name
+    primary_key:
+      - vendor_id
+    foreign_keys: []
+    allowed_joins: []
+    preferred_questions:
+      - Vendor labeling after star-schema guardrails are enabled.
+
+  - name: dim_payment_type
+    description: Payment type dimension mapping TLC payment codes to readable labels.
+    table_type: dimension
+    execution_enabled: false
+    grain: One row per payment_type.
+    fields:
+      - name: payment_type
+        description: TLC payment type code.
+      - name: payment_type_name
+        description: Human-readable payment type label.
+    dimensions:
+      - payment_type
+      - payment_type_name
+    metrics: []
+    allowed_filters:
+      - payment_type
+      - payment_type_name
+    primary_key:
+      - payment_type
+    foreign_keys: []
+    allowed_joins: []
+    preferred_questions:
+      - Payment type labeling after star-schema guardrails are enabled.

@@ -69,9 +69,32 @@ def test_catalog_loader_and_prompt_include_semantic_metadata() -> None:
     fact_trips = next(table for table in catalog.tables if table.name == "fact_trips")
     assert len(fact_trips.foreign_keys) == 6
     assert len(fact_trips.allowed_joins) == 6
+    assert "Planner policy:" in rendered
+    assert "Aggregate marts:" in rendered
     assert "Grain:" in rendered
     assert "Metric: trip_count" in rendered
     assert "Allowed filters:" in rendered
     assert "Primary key: service_type, pickup_date" in rendered
     assert "Execution enabled: true" in rendered
     assert "fact_trips" not in rendered
+    assert "Fact tables:" not in rendered
+    assert "Allowed joins:" not in rendered
+
+
+def test_prompt_can_render_star_schema_planning_context_without_enabling_execution() -> None:
+    catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
+    rendered = render_catalog_for_prompt(catalog, include_disabled=True)
+
+    assert "Aggregate marts:" in rendered
+    assert "Fact tables:" in rendered
+    assert "Dimensions:" in rendered
+    assert "Table: fact_trips" in rendered
+    assert "Execution enabled: false" in rendered
+    assert "Table: dim_vendor" in rendered
+    assert "Table: dim_payment_type" in rendered
+    assert "Allowed joins:" in rendered
+    assert "fact_trips.vendor_id = dim_vendor.vendor_id" in rendered
+    assert "fact_trips.payment_type = dim_payment_type.payment_type" in rendered
+    assert "fact_trips.pickup_zone_id = dim_zone.zone_id" in rendered
+    assert "fact_trips.dropoff_zone_id = dim_zone.zone_id" in rendered
+    assert "Do not reference disabled tables in executable SQL." in rendered

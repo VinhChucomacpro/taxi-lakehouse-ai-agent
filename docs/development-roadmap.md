@@ -220,21 +220,41 @@ Verification:
 
 ## Phase 9: Text-to-SQL Planner For Star Schema
 
-Status: planned.
+Status: completed on 2026-04-24.
 
 Goal: guide the LLM to choose the right query surface and only generate
 catalog-safe SQL.
 
-Required changes:
+Completed:
 
 - Prefer aggregate marts for simple daily KPI and zone demand questions.
-- Use the Gold star schema for vendor, payment type, pickup/dropoff role, and
-  flexible fact/dim analysis.
+- Tell the model to use Gold star schema tables only when they are explicitly
+  execution-enabled and the question needs vendor, payment type,
+  pickup/dropoff role, or flexible fact/dim analysis.
 - Render catalog metadata grouped by aggregate marts, fact, dimensions, and
   allowed joins.
 - Instruct the model not to use unknown columns, non-cataloged joins, or
   `select *`.
-- Add prompt rendering tests and API smoke tests for star-schema questions.
+- Keep the runtime prompt limited to execution-enabled tables so current AI
+  execution still sees only `gold_daily_kpis` and `gold_zone_demand`.
+- Add an `include_disabled=True` planning render path that can show cataloged
+  fact/dim metadata and allowed joins for tests and future controlled exposure.
+- Add prompt rendering tests for runtime aggregate-only prompt behavior and
+  star-schema planning context.
+
+Verification:
+
+- Host-local syntax compile passed for `services/api/app/text_to_sql.py` and
+  `tests/test_semantic_catalog.py`.
+- `python -m pytest -p no:cacheprovider tests/test_semantic_catalog.py` passed
+  with `4 passed`.
+- Host-local `python -m pytest -p no:cacheprovider` passed with `12 passed,
+  2 skipped`; the skipped tests remain dependency-gated in host Python.
+- API-container prompt renderer smoke check confirmed:
+  - runtime prompt does not include `fact_trips`
+  - runtime prompt includes the aggregate marts group
+  - planning context includes `fact_trips`, dimensions, and allowed joins
+- `docker compose restart api` restarted the running API service.
 
 ## Phase 10: Controlled Fact/Dim Exposure And Demo Readiness
 

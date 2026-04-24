@@ -294,6 +294,38 @@ against the semantic catalog before execution. Detailed Gold tables such as
 `fact_trips` reject wildcard `SELECT *`. Joins must match cataloged
 `allowed_joins`; missing-`ON` and cartesian joins are rejected.
 
+## Last Verified Text-to-SQL Planner State
+
+Last Text-to-SQL planner verification: `2026-04-24`.
+
+Implemented behavior:
+
+- Prompt rendering now starts with planner policy: prefer aggregate marts for
+  common daily KPI, service type, and zone demand questions.
+- The model is instructed to use fact/dimension tables only when they are
+  execution-enabled and the question requires star-schema detail.
+- Runtime prompt rendering remains limited to execution-enabled tables, so the
+  current API prompt still excludes `fact_trips` and `dim_*`.
+- Planning-context rendering can include disabled fact/dim tables and allowed
+  joins when called with `include_disabled=True`; this is for tests and future
+  controlled exposure, not current execution.
+- Catalog metadata is grouped by aggregate marts, fact tables, dimensions, and
+  allowed joins.
+
+Verification:
+
+- Host-local syntax compile passed for `services/api/app/text_to_sql.py` and
+  `tests/test_semantic_catalog.py`.
+- `python -m pytest -p no:cacheprovider tests/test_semantic_catalog.py` passed
+  with `4 passed`.
+- Host-local `python -m pytest -p no:cacheprovider` passed with `12 passed,
+  2 skipped`; Docker remains the preferred environment for API/guardrail tests.
+- API-container prompt renderer smoke check confirmed runtime prompt excludes
+  `fact_trips`, runtime prompt includes aggregate marts, and planning context
+  includes `fact_trips`, dimensions, and allowed joins.
+- `docker compose restart api` restarted the running API service so Text-to-SQL
+  requests use the updated prompt code.
+
 For deterministic guardrail testing, `/api/v1/query` accepts an optional `sql`
 field. When `sql` is omitted, the API uses OpenAI to generate SQL from the
 question and then applies the same guardrails before execution.

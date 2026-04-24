@@ -47,8 +47,8 @@ the repo first.
   star schema. They are a fast/safe path for common questions, not a replacement
   for the star schema.
 - The current roadmap direction is controlled AI querying over the Gold star
-  schema. Semantic metadata, column/table guardrails, and join guardrails are
-  implemented; prompt planning and controlled fact/dim execution remain next.
+  schema. Semantic metadata, column/table guardrails, join guardrails, and
+  prompt planning are implemented; controlled fact/dim execution remains next.
 
 ## Session Closeout
 
@@ -152,6 +152,9 @@ a Gold aggregate mart can still be added as a fast path.
   aliases, wildcard restrictions for detailed Gold tables, allowed join paths,
   and query limits.
 - `services/api/app/text_to_sql.py` renders semantic metadata into the LLM prompt.
+- Runtime prompt rendering includes only execution-enabled tables. Use
+  `include_disabled=True` only for planning/tests/future controlled exposure,
+  not for current `/api/v1/query` execution.
 - `services/api/app/catalog.py` loads catalog metadata for the API and prompt.
 - When exposing new tables to AI, add clear field descriptions.
 - Before exposing `fact_trips` or any `dim_*` table, catalog table type, grain,

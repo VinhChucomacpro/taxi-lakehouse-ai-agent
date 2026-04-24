@@ -59,8 +59,10 @@ agent framework unless the user explicitly asks for that change.
   tables.
 - Join guardrails validate explicit `ON` joins against semantic catalog
   `allowed_joins` and reject missing-`ON` or cartesian joins.
+- Text-to-SQL prompt planning prefers aggregate marts for common questions and
+  keeps runtime prompts limited to execution-enabled tables.
 - The next major direction is controlled AI querying over the Gold star schema:
-  prompt planning, and finally controlled fact/dim API exposure.
+  controlled fact/dim API exposure.
 
 ## Local Environment Notes
 

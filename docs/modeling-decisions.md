@@ -52,6 +52,9 @@ Implemented Gold dimensional models:
 - `dim_payment_type`
 - `fact_trips`
 
+Detailed table structure, columns, and approved join paths are documented in
+`docs/gold-star-schema.md`.
+
 `fact_trips` has one row per valid Silver trip. It is the base for better marts
 and drill-down analysis, with join keys for date, service type, vendor, payment
 type, pickup zone, and dropoff zone. It does not replace aggregate marts.

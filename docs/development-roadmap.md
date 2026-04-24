@@ -56,6 +56,9 @@ Gold star schema models:
 `payment_type`, `pickup_zone_id`, and `dropoff_zone_id`. Base metrics include
 `trip_distance`, `fare_amount`, `total_amount`, and `passenger_count`.
 
+Detailed star-schema structure, columns, and join paths are documented in
+`docs/gold-star-schema.md`.
+
 ## Phase 4: Aggregate Marts From Star Schema
 
 Status: completed for the current serving marts.

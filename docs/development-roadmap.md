@@ -529,6 +529,300 @@ Verification:
 - Demo container inspection confirmed the running Streamlit app contains the
   agent timeline UI.
 
+## Phase 12: Defense Dataset And End-To-End Reproducibility
+
+Status: completed on 2026-04-26.
+
+Goal: prove the implemented MVP can be reproduced from source ingestion through
+Gold serving and API access using a fixed defense dataset window.
+
+Completed:
+
+- Selected `2024-01-01` through `2024-06-30` as the fixed defense dataset
+  window for thesis/demo/evaluation/performance work.
+- Verified MinIO Bronze object paths for six Yellow Taxi monthly files and six
+  Green Taxi monthly files in the selected window.
+- Verified Taxi Zone Lookup is present as the reference dataset used for zone
+  enrichment.
+- Started the existing Docker stack with `docker compose up -d`.
+- Triggered Airflow DAG run `phase12_2024_01_20260426` with manual
+  `{year: 2024, month: 1}` config; the run completed successfully.
+- Ran dbt build through the Airflow scheduler container.
+- Recorded row counts for Silver, Gold dimensions, Gold fact, and aggregate
+  marts in `docs/runbook.md`.
+- Verified API health, aggregate mart query, controlled fact/dim query, zone
+  demand query, and blocked DDL behavior.
+- Kept the selected defense dataset window stable for Phase 13-17 work.
+
+Verification target:
+
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- API `/healthz` returned `status=ok`, DuckDB path, and loaded semantic catalog.
+- Streamlit returned HTTP `200`; Airflow `/health` returned HTTP `200`.
+- Airflow run `phase12_2024_01_20260426` finished with `success`.
+- dbt build completed with `PASS=75 WARN=2 ERROR=0 SKIP=0`; warning-only tests
+  were `warn_silver_trip_anomalies` and `warn_gold_metric_anomalies`.
+- API smoke checks returned rows for `gold_daily_kpis`, `gold_zone_demand`, and
+  `fact_trips` joined to `dim_vendor`.
+- Unsafe `drop table gold_daily_kpis` returned HTTP `400`.
+- Row counts and caveats are recorded in `docs/runbook.md`.
+
+Next step: Phase 13, Data Quality, Lineage, And Trust Evidence.
+
+## Phase 13: Data Quality, Lineage, And Trust Evidence
+
+Status: completed on 2026-04-26.
+
+Goal: make the lakehouse trustworthy enough for a thesis defense by documenting
+data quality checks, lineage, and source-data caveats.
+
+Completed:
+
+- Created `docs/data-quality-report.md`.
+- Summarized dbt tests for Bronze, Silver, Gold fact/dim tables, and aggregate
+  marts.
+- Reported null checks, accepted-value checks, relationship checks, partition
+  filtering, and anomaly warnings.
+- Added defense-window evidence for records filtered by Silver validity rules,
+  invalid pickup/dropoff order, unusually long trip distances, negative amounts,
+  and Gold metric anomalies.
+- Documented lineage from TLC source files to MinIO Bronze, Silver standardized
+  trips, Gold star schema, aggregate marts, API, and read-only agent.
+- Separated warning-only source-data caveats from blocking pipeline defects.
+
+Verification target:
+
+- dbt build output from Phase 12 is cited with verification date `2026-04-26`.
+- Row counts and anomaly counts are consistent with the Phase 12 defense
+  dataset window, `2024-01-01` through `2024-06-30`.
+- The report explains that dbt completed with `PASS=75 WARN=2 ERROR=0 SKIP=0`
+  and that warning-only anomaly tests are not blocking failures.
+- `docs/runbook.md` links the Phase 13 report.
+
+Next step: Phase 14, Agent Evaluation And Guardrail Benchmark.
+
+## Phase 14: Agent Evaluation And Guardrail Benchmark
+
+Status: planned.
+
+Goal: evaluate the read-only AI query agent as an engineering component, not
+only as a Streamlit demo.
+
+Required completion:
+
+- Create `docs/agent-evaluation.md`.
+- Build an evaluation set of 20-30 Vietnamese and English questions covering
+  KPI trends, service comparison, zone demand, vendor analysis, payment type,
+  pickup/dropoff analysis, ambiguous questions, and unsafe SQL attempts.
+- For each case, record expected behavior: executed answer, clarification, or
+  rejection.
+- Measure planner behavior by query surface: aggregate mart, star schema,
+  clarification, or blocked.
+- Verify guardrails for DML, DDL, Bronze/Silver access, unknown table, unknown
+  column, `select *` on detailed Gold tables, invalid join, missing `ON`, and
+  cartesian join.
+- Confirm deterministic answers are grounded only in executed SQL rows.
+- Confirm OpenAI answer synthesis remains optional and the demo works when
+  synthesis is disabled.
+
+Verification target:
+
+- Existing semantic catalog, SQL guardrail, clarification, trace-shape, and API
+  smoke tests continue to pass.
+- Docker-based API checks cover the evaluation cases that require runtime
+  dependencies from the API container.
+- The evaluation report includes pass/fail status, generated SQL or block
+  reason, and known limitations.
+
+Next step: Phase 15, Demo Scenario Pack And Product Demo UX.
+
+## Phase 15: Demo Scenario Pack And Product Demo UX
+
+Status: planned.
+
+Goal: turn the system into a stable defense and product-style demo with fixed
+scenarios instead of improvised prompts.
+
+Required completion:
+
+- Create `docs/demo-scenarios.md`.
+- Define 8-12 official demo scenarios with prompt, expected query surface,
+  expected result shape, and the main explanation point for defense.
+- Cover schema browsing, aggregate mart questions, star-schema fact/dim
+  analysis, Vietnamese natural-language questions, clarification behavior,
+  blocked unsafe SQL, charting, SQL expander, agent timeline, and CSV export.
+- Ensure Streamlit exposes stable example prompts for monthly Yellow/Green
+  comparison, top pickup zones, vendor analysis, payment distribution,
+  pickup/dropoff borough analysis, ambiguous questions, and blocked SQL.
+- Improve user-facing demo polish only where it reduces confusion: clearer
+  errors, stable result state, readable timeline labels, and obvious export
+  behavior.
+
+Verification target:
+
+- Streamlit returns HTTP `200`.
+- Each official scenario works against the Phase 12 defense dataset window.
+- Manual review confirms table output, optional charts, SQL expander, agent
+  timeline, clarification output, blocked-query output, and CSV export.
+- API smoke checks cover the non-UI scenario behavior where practical.
+
+Next step: Phase 16, Operational Hardening.
+
+## Phase 16: Operational Hardening
+
+Status: planned.
+
+Goal: add product-lite operational evidence around the API and agent while
+preserving read-only behavior and local-first deployment.
+
+Required completion:
+
+- Add a query audit log for API/agent requests with question, generated or
+  provided SQL, validation status, execution status, execution time, warnings,
+  confidence, and clarification or block reason when applicable.
+- Improve health checks so they report API status, semantic catalog loading,
+  DuckDB connectivity, and configured Gold warehouse path.
+- Add or document query timeout, max row limit, and error response behavior.
+- Improve error messages for blocked queries without exposing unsafe internals
+  or suggesting bypasses.
+- Update `.env.example` and `docs/runbook.md` with operational configuration
+  notes.
+- Do not add write-capable behavior or broaden the agent beyond curated Gold
+  access.
+
+Verification target:
+
+- API smoke checks confirm successful, clarification, and blocked requests are
+  logged.
+- Health endpoint checks pass in Docker.
+- Guardrail tests still block unsafe SQL after logging and health changes.
+- Runbook documents log location, fields, and troubleshooting steps.
+
+Next step: Phase 17, Performance And Materialization Review.
+
+## Phase 17: Performance And Materialization Review
+
+Status: planned.
+
+Goal: make local demo responsiveness measurable and make materialization
+choices defensible.
+
+Required completion:
+
+- Create `docs/performance-report.md`.
+- Benchmark representative API queries over the Phase 12 dataset window:
+  daily KPI trend, zone demand ranking, vendor aggregation, payment-type
+  aggregation, and pickup/dropoff zone joins.
+- Review dbt materializations for Gold fact, dimensions, and aggregate marts.
+- Keep aggregate marts as the fast path for common dashboard and agent
+  questions.
+- Add persisted tables, indexes, or DuckDB-friendly materializations only when
+  benchmarks show a clear benefit.
+- Document tradeoffs between freshness, local storage size, build time, and
+  query latency.
+
+Verification target:
+
+- The performance report records before/after timings when changes are made.
+- dbt build still passes after any materialization change.
+- API smoke tests still pass and SQL guardrails are unchanged.
+- If no performance change is needed, document that decision with measured
+  evidence.
+
+Next step: Phase 18, CI/CD And Release Packaging.
+
+## Phase 18: CI/CD And Release Packaging
+
+Status: planned.
+
+Goal: make the project easier to verify repeatedly and package for thesis
+submission or handoff.
+
+Required completion:
+
+- Add CI checks where the repository environment supports them: Python tests,
+  semantic catalog tests, SQL guardrail tests, and lightweight docs consistency
+  checks.
+- Keep Docker-based verification documented for API checks that depend on the
+  container runtime dependency set.
+- Standardize `.env.example`, startup instructions, reset instructions, and
+  known local ports.
+- Create `docs/release-checklist.md` for pre-defense and final-submission
+  checks.
+- Document which checks are mandatory for code changes, dbt changes, API
+  changes, docs-only changes, and final release.
+
+Verification target:
+
+- CI or local equivalent checks can be run from documented commands.
+- Release checklist includes Docker startup, Airflow, MinIO, dbt, FastAPI,
+  Streamlit, official demo scenarios, and known caveats.
+- No secrets are committed or printed in release notes.
+
+Next step: Phase 19, Security-Lite And Governance.
+
+## Phase 19: Security-Lite And Governance
+
+Status: planned.
+
+Goal: add enough security and governance for a product-style demo without
+turning the project into a production multi-tenant platform.
+
+Required completion:
+
+- Create `docs/security-notes.md`.
+- Document current safety boundaries: read-only DuckDB access, Gold-only query
+  surface, semantic catalog validation, SQL guardrails, max row limits, and
+  optional answer synthesis.
+- Add simple API protection only if needed for demo deployment, such as an API
+  key or basic auth.
+- Add simple rate limiting only if the selected deployment/demo environment
+  needs it.
+- Document secret handling, `.env` hygiene, OpenAI API key usage, and audit log
+  retention.
+- Explicitly keep multi-tenant auth, production RBAC, write agents, and cloud
+  production deployment out of scope.
+
+Verification target:
+
+- Security notes describe both implemented controls and out-of-scope controls.
+- If API protection is added, API and Streamlit calls are updated and tested.
+- Guardrail tests still prove DML/DDL, Bronze/Silver access, invalid joins, and
+  detailed wildcard queries are blocked.
+
+Next step: Phase 20, Final Thesis/Product Freeze.
+
+## Phase 20: Final Thesis/Product Freeze
+
+Status: planned.
+
+Goal: freeze a complete thesis-ready and product-style MVP with clear evidence,
+scope boundaries, and reproducible instructions.
+
+Required completion:
+
+- Update README with final setup, demo flow, architecture overview, defense
+  dataset window, and project scope boundaries.
+- Update thesis-facing docs: architecture, data contracts, modeling decisions,
+  Gold star schema, runbook, data quality report, agent evaluation, demo
+  scenarios, performance report, release checklist, and security notes.
+- Mark thesis-critical phases as completed or clearly document remaining
+  caveats.
+- Freeze out-of-scope items: FHV/HVFHV, streaming, write-capable agents,
+  multi-tenant auth, production cloud deployment, and new agent frameworks.
+- Tag or record the final commit/version used for thesis submission.
+
+Verification target:
+
+- Fresh `docker compose up -d` works from documented instructions.
+- Full relevant test suite and Docker smoke checks pass.
+- Final demo scenarios work against the Phase 12 defense dataset window.
+- Final docs contain verification date, commands, results, pass/fail status,
+  caveats, and next-step notes.
+
+Next step: post-thesis extensions only after the thesis/product MVP is frozen.
+
 ## Documentation And Handoff Rule
 
 After each meaningful phase or working session, update the durable project

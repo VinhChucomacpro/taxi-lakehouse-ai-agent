@@ -60,6 +60,98 @@
   validates SQL with `sqlglot`, only allows read-only `SELECT` statements, runs
   self-checks, and executes against DuckDB in read-only mode.
 
+## Last Verified Phase 12 Defense Dataset State
+
+Last defense dataset verification: `2026-04-26`.
+
+Selected defense dataset window:
+
+- `2024-01-01` through `2024-06-30`
+- Yellow Taxi and Green Taxi monthly files for `2024-01` through `2024-06`
+- Taxi Zone Lookup reference dataset for zone enrichment
+
+Verification commands and results:
+
+- `docker compose up -d` started the existing stack without rebuilding images.
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- `GET http://localhost:8000/healthz` returned `status=ok`,
+  `duckdb_path=/data/warehouse/analytics.duckdb`, and
+  `semantic_catalog_loaded=true`.
+- Streamlit returned HTTP `200` at `http://localhost:8501`.
+- Airflow returned HTTP `200` at `http://localhost:8080/health`.
+- MinIO local backing storage contained six Yellow Taxi and six Green Taxi
+  Bronze object directories for the selected defense window.
+- Taxi Zone Lookup existed at
+  `data/minio/taxi-lakehouse/reference/taxi_zone_lookup/taxi_zone_lookup.csv`.
+- Airflow DAG `taxi_monthly_pipeline` was triggered with run id
+  `phase12_2024_01_20260426` and config `{year: 2024, month: 1}`.
+- The Airflow DAG run finished with `success`, from
+  `2026-04-26T14:22:52.343988+00:00` to
+  `2026-04-26T14:24:37.084520+00:00`.
+- dbt build through the Airflow scheduler container completed with
+  `PASS=75 WARN=2 ERROR=0 SKIP=0`.
+- The warning-only tests were:
+  - `warn_silver_trip_anomalies`: `18011` warning rows
+  - `warn_gold_metric_anomalies`: `1` warning row
+
+Observed row counts after dbt build:
+
+- `silver_trips_unified`: `98093195`
+- `dim_date`: `821`
+- `dim_zone`: `265`
+- `dim_service_type`: `2`
+- `dim_vendor`: `4`
+- `dim_payment_type`: `6`
+- `fact_trips`: `98093195`
+- `gold_daily_kpis`: `1642`
+- `gold_zone_demand`: `283947`
+- `fact_trips` date range: `2023-12-01` through `2026-02-28`
+- Defense window `fact_trips` rows: `20354795`
+- Defense window `gold_daily_kpis` rows: `364`
+- Defense window `gold_zone_demand` rows: `61154`
+
+API smoke checks for the selected defense window:
+
+- `gold_daily_kpis` query returned daily trip counts for service types starting
+  at `2024-01-01`; highest returned row in the sample was Yellow Taxi with
+  `79707` trips.
+- `fact_trips` joined to `dim_vendor` returned three vendor rows; top vendor in
+  the sample was `VeriFone Inc.` with `15390527` trips.
+- `gold_zone_demand` top pickup-zone query returned five rows; top zone in the
+  sample was `Midtown Center`, `Manhattan`, with `941328` trips.
+- Unsafe `drop table gold_daily_kpis` returned HTTP `400`.
+
+Notes and caveats:
+
+- The selected defense window is `2024-H1`, but the local warehouse currently
+  contains a broader loaded date range from `2023-12` through `2026-02`.
+- Phase 12 intentionally keeps the broader warehouse available; demo,
+  evaluation, and performance scenarios should filter to `2024-H1` when they
+  need stable defense-window results.
+- Warning-only anomaly rows are source-data quality evidence for Phase 13, not
+  blocking dbt failures.
+
+## Last Verified Phase 13 Data Quality State
+
+Last data quality verification: `2026-04-26`.
+
+Phase 13 output:
+
+- `docs/data-quality-report.md`
+
+The report uses the Phase 12 defense dataset window, `2024-01-01` through
+`2024-06-30`, and documents:
+
+- dbt build result `PASS=75 WARN=2 ERROR=0 SKIP=0`
+- Bronze, Silver, Gold fact/dim, and aggregate mart row counts
+- Silver validity filtering from raw Bronze into curated Silver
+- warning-only anomaly counts for Silver and Gold
+- dbt test coverage across Bronze, Silver, Gold star schema, and aggregate marts
+- lineage from TLC source files through MinIO, dbt, DuckDB, FastAPI, and the
+  read-only agent
+- known caveats and out-of-scope areas
+
 ## Last Verified MVP State
 
 Last local end-to-end verification: `2026-04-22`.

@@ -25,6 +25,7 @@ group by v.vendor_name
 order by trip_count desc"""
 GUARDRAIL_SQL = "select * from silver_trips_unified"
 FACT_WILDCARD_SQL = "select * from fact_trips"
+AI_HISTORY_KEY = "ai_history"
 DEMO_QUESTIONS = (
     "So sánh số chuyến Yellow Taxi và Green Taxi theo tháng trong nửa đầu năm 2024",
     "Top pickup zones by trip count in 2024 H1",
@@ -94,6 +95,139 @@ def store_query_outcome(
     st.session_state[error_key(key_prefix)] = error
     st.session_state[status_key(key_prefix)] = status_code
     st.session_state[f"{key_prefix}_show_chart"] = False
+
+
+def ai_history() -> list[dict[str, Any]]:
+    if AI_HISTORY_KEY not in st.session_state:
+        st.session_state[AI_HISTORY_KEY] = []
+    return st.session_state[AI_HISTORY_KEY]
+
+
+def ai_history_item(
+    *,
+    question: str,
+    result: dict[str, Any] | None,
+    error: str | None,
+    status_code: int | None,
+) -> dict[str, Any]:
+    if error:
+        return {
+            "question": question,
+            "status": "error",
+            "message": error,
+            "status_code": status_code,
+            "sql": "",
+            "row_count": 0,
+            "execution_ms": None,
+            "warnings": [],
+        }
+
+    if not result:
+        return {
+            "question": question,
+            "status": "error",
+            "message": "No response returned.",
+            "status_code": status_code,
+            "sql": "",
+            "row_count": 0,
+            "execution_ms": None,
+            "warnings": [],
+        }
+
+    requires_clarification = bool(result.get("requires_clarification"))
+    message = (
+        result.get("clarification_question")
+        or result.get("answer")
+        or result.get("summary")
+        or ""
+    )
+    return {
+        "question": question,
+        "status": "clarification" if requires_clarification else "success",
+        "message": message,
+        "status_code": status_code,
+        "sql": result.get("sql", ""),
+        "row_count": len(result.get("rows", [])),
+        "execution_ms": result.get("execution_ms"),
+        "warnings": result.get("warnings") or [],
+    }
+
+
+def append_ai_history(
+    *,
+    question: str,
+    result: dict[str, Any] | None,
+    error: str | None,
+    status_code: int | None,
+) -> None:
+    ai_history().append(
+        ai_history_item(
+            question=question,
+            result=result,
+            error=error,
+            status_code=status_code,
+        )
+    )
+
+
+def run_ai_query(question: str, max_rows: int) -> None:
+    payload = {"question": question, "max_rows": max_rows}
+    with st.spinner("Generating and validating SQL..."):
+        result, error, status_code = post_query(payload)
+    store_query_outcome(
+        "ai",
+        result=result,
+        error=error,
+        status_code=status_code,
+    )
+    append_ai_history(
+        question=question,
+        result=result,
+        error=error,
+        status_code=status_code,
+    )
+
+
+def render_ai_history() -> None:
+    history = ai_history()
+    if not history:
+        return
+
+    st.subheader("Ask AI history")
+    if st.button("Clear history"):
+        st.session_state[AI_HISTORY_KEY] = []
+        return
+
+    for index, item in enumerate(reversed(history), start=1):
+        status = item.get("status", "unknown")
+        question = item.get("question", "")
+        row_count = item.get("row_count", 0)
+        execution_ms = item.get("execution_ms")
+        title = f"{index}. {status.title()}: {question[:80]}"
+        with st.expander(title, expanded=index == 1):
+            st.markdown(f"**Question:** {question}")
+            message = item.get("message")
+            if message:
+                if status == "error":
+                    st.error(message)
+                elif status == "clarification":
+                    st.warning(message)
+                else:
+                    st.info(message)
+            metric_col, latency_col, status_col = st.columns(3)
+            metric_col.metric("Rows", row_count)
+            latency_col.metric(
+                "Execution",
+                f"{execution_ms} ms" if execution_ms is not None else "n/a",
+            )
+            status_col.metric("HTTP", item.get("status_code") or "n/a")
+            warnings = item.get("warnings") or []
+            if warnings:
+                for warning in warnings:
+                    st.warning(warning)
+            sql = item.get("sql")
+            if sql:
+                st.code(sql, language="sql")
 
 
 def render_query_state(key_prefix: str, *, error_label: str = "Request failed") -> None:
@@ -494,12 +628,9 @@ with tab_ai:
         height=120,
     )
     if st.button("Run AI query", type="primary"):
-        run_query(
-            "ai",
-            {"question": question, "max_rows": max_rows},
-            "Generating and validating SQL...",
-        )
+        run_ai_query(question, max_rows)
     render_query_state("ai")
+    render_ai_history()
 
 with tab_sql:
     sql = st.text_area("SQL", value=DEFAULT_SQL, height=180)

@@ -7,7 +7,8 @@ Defense dataset window: `2024-01-01` through `2024-06-30`
 Use these scenarios for thesis defense and product-style walkthroughs. They are
 designed to show the complete system: schema, deterministic SQL, read-only agent
 timeline, curated marts, controlled star-schema access, guardrails, charts, and
-CSV export.
+CSV export. The Ask AI tab also keeps a session-local history display for demo
+continuity; this is not multi-turn agent memory and is not sent to the API.
 
 ## Demo Flow
 
@@ -18,7 +19,9 @@ CSV export.
 4. Open `Schema` and show that only curated Gold objects are exposed.
 5. Run one SQL mart scenario, one star-schema scenario, one Ask AI scenario, one
    chart/export scenario, and one blocked-query scenario.
-6. Keep prompts and SQL filtered to `2024-H1` when a stable defense result is
+6. Use Ask AI history to show previous prompts and answers during the same demo
+   session without implying context-aware follow-up behavior.
+7. Keep prompts and SQL filtered to `2024-H1` when a stable defense result is
    needed.
 
 ## Official Scenarios
@@ -36,7 +39,8 @@ CSV export.
 | `D09` | Ask AI | `trips` | Clarification | Agent asks for metric/grain/time scope instead of executing |
 | `D10` | Guardrails | `Silver access` blocked query | Rejection | Bronze/Silver are not exposed to the agent |
 | `D11` | Guardrails | `Fact wildcard` blocked query | Rejection | Detailed Gold wildcard access is blocked |
-| `D12` | Any successful result | Enable `Show chart`, then `Export CSV` | Result UX | Human-reviewed chart rendering and reproducible export |
+| `D12` | Ask AI | Run two prompts, then clear history | Session-local UI history | Previous Ask AI results display newest-first; clearing history does not call the API |
+| `D13` | Any successful result | Enable `Show chart`, then `Export CSV` | Result UX | Human-reviewed chart rendering and reproducible export |
 
 ## Scenario Notes
 
@@ -47,7 +51,9 @@ CSV export.
 - `D09` demonstrates safe clarification behavior for broad questions.
 - `D10` and `D11` demonstrate that the API does not expose raw lakehouse layers
   or uncontrolled detail queries.
-- `D12` should be run after a successful table result so charting and export are
+- `D12` demonstrates that the demo shows a local history log without turning the
+  agent into a multi-turn chat system.
+- `D13` should be run after a successful table result so charting and export are
   visible without hiding the underlying rows.
 
 ## Expected Evidence

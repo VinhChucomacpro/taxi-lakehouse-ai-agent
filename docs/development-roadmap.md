@@ -833,64 +833,211 @@ Next step: Phase 19, Security-Lite And Governance.
 
 ## Phase 19: Security-Lite And Governance
 
-Status: planned.
+Status: completed on 2026-04-28.
 
 Goal: add enough security and governance for a product-style demo without
 turning the project into a production multi-tenant platform.
 
-Required completion:
+Completed:
 
-- Create `docs/security-notes.md`.
-- Document current safety boundaries: read-only DuckDB access, Gold-only query
+- Created `docs/security-notes.md`.
+- Documented current safety boundaries: read-only DuckDB access, Gold-only query
   surface, semantic catalog validation, SQL guardrails, max row limits, and
   optional answer synthesis.
-- Add simple API protection only if needed for demo deployment, such as an API
-  key or basic auth.
-- Add simple rate limiting only if the selected deployment/demo environment
-  needs it.
-- Document secret handling, `.env` hygiene, OpenAI API key usage, and audit log
+- Decided not to add API key/basic auth or rate limiting for the current
+  localhost thesis/demo scope. Documented that these controls should be added
+  before any non-local deployment.
+- Documented secret handling, `.env` hygiene, OpenAI API key usage, and audit log
   retention.
-- Explicitly keep multi-tenant auth, production RBAC, write agents, and cloud
+- Explicitly kept multi-tenant auth, production RBAC, write agents, and cloud
   production deployment out of scope.
+- Updated the release checklist and release consistency check so security notes
+  are included in final handoff verification.
 
-Verification target:
+Verification:
 
 - Security notes describe both implemented controls and out-of-scope controls.
-- If API protection is added, API and Streamlit calls are updated and tested.
-- Guardrail tests still prove DML/DDL, Bronze/Silver access, invalid joins, and
-  detailed wildcard queries are blocked.
+- API protection was not added because the current release target is local-only;
+  no Streamlit/API auth wiring was required.
+- Guardrail evidence remains covered by prior API release smoke checks and
+  Phase 14/16/18 verification for DML/DDL, Bronze/Silver access, invalid joins,
+  and detailed wildcard blocking.
+- `python scripts/release_check.py` passed.
+- `python -m pytest -p no:cacheprovider` passed with `20 passed, 2 skipped`;
+  the skipped tests are the known host dependency-gated API and SQL guardrail
+  tests.
 
 Next step: Phase 20, Final Thesis/Product Freeze.
 
 ## Phase 20: Final Thesis/Product Freeze
 
-Status: planned.
+Status: completed on 2026-04-28.
 
 Goal: freeze a complete thesis-ready and product-style MVP with clear evidence,
 scope boundaries, and reproducible instructions.
 
-Required completion:
+Completed:
 
-- Update README with final setup, demo flow, architecture overview, defense
+- Updated README with final setup, demo flow, architecture overview, defense
   dataset window, and project scope boundaries.
-- Update thesis-facing docs: architecture, data contracts, modeling decisions,
+- Reviewed thesis-facing docs: architecture, data contracts, modeling decisions,
   Gold star schema, runbook, data quality report, agent evaluation, demo
-  scenarios, performance report, release checklist, and security notes.
-- Mark thesis-critical phases as completed or clearly document remaining
+  scenarios, performance report, release checklist, and security notes. The
+  project state remains aligned with the local-first read-only agent MVP.
+- Marked thesis-critical phases as completed and documented remaining
   caveats.
-- Freeze out-of-scope items: FHV/HVFHV, streaming, write-capable agents,
+- Froze out-of-scope items: FHV/HVFHV, streaming, write-capable agents,
   multi-tenant auth, production cloud deployment, and new agent frameworks.
-- Tag or record the final commit/version used for thesis submission.
+- Recorded final freeze verification in README, roadmap, release checklist, and
+  runbook. A git tag or final commit hash should be recorded by the project
+  owner after committing the freeze changes.
+- Added a post-freeze Streamlit demo polish: session-local Ask AI history
+  display. This is UI-only history and does not change the API contract or add
+  multi-turn agent memory.
 
-Verification target:
+Verification:
 
-- Fresh `docker compose up -d` works from documented instructions.
-- Full relevant test suite and Docker smoke checks pass.
-- Final demo scenarios work against the Phase 12 defense dataset window.
+- `python scripts/release_check.py` passed.
+- `python -m pytest -p no:cacheprovider` passed with `20 passed, 2 skipped`;
+  the skipped tests are the known host dependency-gated API and SQL guardrail
+  tests.
+- Docker smoke checks passed after Docker Desktop was started:
+  - `docker compose up -d` started the existing stack.
+  - `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler,
+    and Airflow webserver running.
+  - API `/healthz` returned `status=ok`, `duckdb_exists=true`, and
+    `duckdb_connectable=true`.
+  - Streamlit returned HTTP `200`.
+  - Airflow `/health` returned HTTP `200`.
+  - Release API smoke checks returned HTTP `200` for a valid Gold query, HTTP
+    `400` for DDL, and HTTP `400` for `select * from fact_trips`.
+- Ask AI history display verification:
+  - syntax AST parse passed for `services/demo/app.py`
+  - `python -m pytest -p no:cacheprovider` passed with `20 passed, 2 skipped`
+  - `python scripts/release_check.py` passed
+  - `docker compose up -d --build demo` rebuilt and restarted API/demo
+  - Streamlit returned HTTP `200`
+  - demo container inspection confirmed `AI_HISTORY_KEY`, `render_ai_history`,
+    and `Clear history` are present
+  - API smoke checks still returned HTTP `200` for a valid Gold query and HTTP
+    `400` for `select * from fact_trips`
+- Final demo scenarios are defined against the Phase 12 defense dataset window.
 - Final docs contain verification date, commands, results, pass/fail status,
   caveats, and next-step notes.
 
-Next step: post-thesis extensions only after the thesis/product MVP is frozen.
+Next step: Phase 21, Final Handoff Snapshot.
+
+## Phase 21: Final Handoff Snapshot
+
+Status: planned.
+
+Goal: create a traceable final submission snapshot after the Phase 20 freeze.
+
+Required completion:
+
+- Commit the Phase 19-20 security, freeze, and Ask AI history display changes.
+- Record the final commit hash or git tag used for thesis submission in the
+  roadmap and runbook.
+- Rerun the release checks:
+  - `python scripts/release_check.py`
+  - `python -m pytest -p no:cacheprovider`
+  - Docker smoke checks from `docs/release-checklist.md`
+- Do not change API contracts, dbt models, semantic catalog, or guardrail policy
+  unless verification fails and a fix is required.
+
+Verification target:
+
+- The repository has a clear final commit or tag.
+- README, roadmap, runbook, and release checklist describe the same final
+  state.
+- The local Docker stack starts and the official demo entry points respond.
+
+Next step: Phase 22, Defense Rehearsal And Evidence Refresh.
+
+## Phase 22: Defense Rehearsal And Evidence Refresh
+
+Status: planned.
+
+Goal: make the live defense/demo predictable using the fixed scenario pack.
+
+Required completion:
+
+- Run the official scenarios in `docs/demo-scenarios.md` in defense order.
+- Record fresh results in `docs/runbook.md`: API health, Streamlit, Airflow,
+  valid Gold query, clarification behavior, and blocked-query behavior.
+- Confirm key demo prompts and SQL remain filtered to the Phase 12 defense
+  window, `2024-01-01` through `2024-06-30`, when stable results are needed.
+- Prepare a short defense narrative for:
+  - MinIO as Bronze source of truth.
+  - Gold star schema plus aggregate marts.
+  - Read-only agent workflow and guardrails.
+  - Out-of-scope items: FHV/HVFHV, streaming, write-capable agents, production
+    auth, cloud deployment, and new agent frameworks.
+
+Verification target:
+
+- The demo can be completed in 10-15 minutes without improvising prompts.
+- Runbook contains the latest evidence and caveats.
+- Ask AI history is presented as session-local display history, not multi-turn
+  context memory.
+
+Next step: Phase 23, Low-Risk Quality Gate Cleanup.
+
+## Phase 23: Low-Risk Quality Gate Cleanup
+
+Status: planned.
+
+Goal: reduce small defense and handoff risks without expanding the product
+scope.
+
+Required completion:
+
+- Add or document a consistency check between dbt Gold model names and
+  `contracts/semantic_catalog.yaml` entries.
+- Review host-local skipped tests. Either document Docker-first verification as
+  the intended path, or add missing dev dependency notes if the host check can
+  be made non-skipping without installing runtime dependencies ad hoc.
+- Keep guardrail behavior unchanged unless a concrete bug is found.
+- Keep Gold materialization unchanged unless a new benchmark shows a clear
+  latency need.
+
+Verification target:
+
+- Release check still passes.
+- Host tests still pass with only known skips, or the skip explanation is
+  updated.
+- Docker API smoke checks still prove valid Gold access and blocked unsafe SQL.
+
+Next step: Phase 24, Post-Thesis Extension Decision Gate.
+
+## Phase 24: Post-Thesis Extension Decision Gate
+
+Status: planned.
+
+Goal: choose exactly one post-thesis extension path before implementing new
+scope.
+
+Required completion:
+
+- Select one extension direction:
+  - Public demo hardening: API key/basic auth, matching Streamlit wiring, simple
+    rate limiting, and deployment-managed secrets.
+  - Performance extension: rerun benchmarks and materialize aggregate marts only
+    if timing evidence justifies it.
+  - Data extension: evaluate FHV/HVFHV or new reference datasets with ingestion,
+    dbt, contracts, tests, and docs updated together.
+  - Agent extension: improve planner/evaluation coverage while preserving
+    read-only, Gold-only, framework-light behavior.
+- Update the roadmap with the selected direction before implementation.
+- Keep the Phase 20 thesis MVP reproducible while extension work happens.
+
+Verification target:
+
+- Scope is explicitly chosen before code changes start.
+- New interface, model, or data-source changes include tests and docs.
+- The frozen thesis MVP remains runnable from documented instructions.
+
+Next step: post-thesis implementation only after Phase 24 chooses a direction.
 
 ## Documentation And Handoff Rule
 

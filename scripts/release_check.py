@@ -21,6 +21,7 @@ REQUIRED_DOCS = [
     "docs/demo-scenarios.md",
     "docs/performance-report.md",
     "docs/release-checklist.md",
+    "docs/security-notes.md",
 ]
 
 REQUIRED_ENV_KEYS = [
@@ -113,6 +114,7 @@ def check_release_checklist() -> list[str]:
         "FastAPI",
         "Streamlit",
         "demo scenarios",
+        "security",
     ]
     return [
         f"docs/release-checklist.md is missing release topic: {term}"

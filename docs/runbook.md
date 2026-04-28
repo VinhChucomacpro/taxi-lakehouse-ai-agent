@@ -384,6 +384,138 @@ Next action:
   multi-tenant RBAC, write agents, and cloud deployment out of scope unless the
   project scope changes.
 
+## Last Verified Phase 19 Security-Lite State
+
+Last Phase 19 verification: `2026-04-28`.
+
+Phase 19 output:
+
+- `docs/security-notes.md`
+
+Implemented behavior:
+
+- Documented the current read-only query safety boundaries: DuckDB read-only
+  execution, `SELECT`-only SQL, curated Gold-only access, semantic catalog table
+  and column validation, detailed wildcard restrictions, allowed join paths,
+  request row caps, clarification behavior, and deterministic self-checks.
+- Documented OpenAI usage: deterministic paths work without an API key, SQL
+  generation is still guardrail-validated, and answer synthesis remains opt-in
+  through `OPENAI_ANSWER_SYNTHESIS`.
+- Documented local secret handling for `.env`, `.env.example`, `OPENAI_API_KEY`,
+  MinIO credentials, shared docs, and release artifacts.
+- Documented JSONL query audit log contents and local retention expectations.
+- Kept API key/basic auth and rate limiting out of the current implementation
+  because the release target remains localhost-only. The security notes describe
+  the controls required before any non-local deployment.
+- Updated `docs/release-checklist.md` and `scripts/release_check.py` so security
+  notes are part of final release verification.
+
+Verification:
+
+- `python scripts/release_check.py` passed.
+- `python -m pytest -p no:cacheprovider` returned `20 passed, 2 skipped`.
+- The skipped tests are the known host dependency-gated API and SQL guardrail
+  tests; Docker remains the preferred runtime verification environment for
+  those checks.
+
+Next action:
+
+- Phase 20: final thesis/product freeze. Review README and thesis-facing docs
+  for final consistency, then run full release checks and Docker smoke checks.
+
+## Last Verified Phase 20 Final Freeze State
+
+Last Phase 20 verification: `2026-04-28`.
+
+Phase 20 output:
+
+- Finalized `README.md` for thesis/product handoff.
+- Updated `docs/development-roadmap.md` so Phase 20 is marked completed.
+- Updated `docs/release-checklist.md` verification date.
+
+Implemented behavior:
+
+- README now documents the implemented MVP state, architecture, fixed
+  `2024-H1` defense dataset window, local setup, demo flow, verification
+  commands, security/governance notes, repository layout, and key thesis docs.
+- Scope boundaries are frozen for thesis handoff: FHV/HVFHV, streaming,
+  write-capable agents, multi-tenant auth, production cloud deployment, and new
+  agent frameworks remain out of scope.
+- Thesis-facing docs remain aligned with the implemented system: MinIO-backed
+  Bronze source of truth, dbt `Bronze -> Silver -> Gold`, Gold star schema plus
+  aggregate marts, controlled read-only agent querying over Gold, deterministic
+  default answers, optional OpenAI answer synthesis, audit logging, and
+  security-lite governance.
+
+Verification:
+
+- `python scripts/release_check.py` passed.
+- `python -m pytest -p no:cacheprovider` returned `20 passed, 2 skipped`.
+- The skipped tests are the known host dependency-gated API and SQL guardrail
+  tests. Use Docker-based API smoke checks from `docs/release-checklist.md`
+  before a live defense or after committing the final freeze.
+- `docker compose up -d` started the existing stack after Docker Desktop was
+  available.
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- `GET http://localhost:8000/healthz` returned `status=ok`,
+  `duckdb_exists=true`, and `duckdb_connectable=true`.
+- Streamlit returned HTTP `200` at `http://localhost:8501`.
+- Airflow returned HTTP `200` at `http://localhost:8080/health`.
+- Release API smoke checks returned:
+  - HTTP `200` for a valid `gold_daily_kpis` query filtered to `2024-H1`
+  - HTTP `400` for `drop table gold_daily_kpis`
+  - HTTP `400` for `select * from fact_trips`
+
+Final caveats:
+
+- The local warehouse can contain data outside the fixed `2024-H1` defense
+  window; official demo queries should keep their defense-window filters.
+- Warning-only dbt anomaly tests are source-data caveats, not blocking pipeline
+  failures.
+- OpenAI answer synthesis remains opt-in and should stay disabled unless it is
+  intentionally demonstrated.
+- No production auth, multi-tenant RBAC, public deployment hardening, or rate
+  limiting is included in this MVP.
+
+Next action:
+
+- Commit the freeze changes and record the final commit hash or tag used for
+  thesis submission.
+
+## Last Verified Ask AI History Display
+
+Last verification: `2026-04-28`.
+
+Implemented behavior:
+
+- Streamlit `Ask AI` now stores a session-local `ai_history` list for demo
+  display.
+- Each Ask AI request appends question, status, answer/clarification/error
+  message, SQL when present, row count, execution time, and warnings.
+- History renders newest-first under the current Ask AI result.
+- `Clear history` removes only the UI session history. It does not call the API,
+  clear current query results, or modify the JSONL query audit log.
+- History is not sent to `/api/v1/query`; Ask AI requests remain independent and
+  are not multi-turn context-aware queries.
+
+Verification:
+
+- Syntax AST parse passed for `services/demo/app.py`.
+- `python -m pytest -p no:cacheprovider` returned `20 passed, 2 skipped`.
+- `python scripts/release_check.py` passed.
+- `docker compose up -d --build demo` rebuilt and restarted the demo. Compose
+  also rebuilt/recreated the API service because demo depends on API.
+- `GET http://localhost:8000/healthz` returned `status=ok`,
+  `duckdb_exists=true`, and `duckdb_connectable=true`.
+- Streamlit returned HTTP `200` at `http://localhost:8501`.
+- Demo container inspection confirmed `AI_HISTORY_KEY`, `render_ai_history`, and
+  `Clear history` are present in `/app/app.py`.
+- API smoke query over `gold_daily_kpis` returned HTTP `200`, five rows, and
+  `agent_steps`.
+- API smoke query `drop table gold_daily_kpis` returned HTTP `400`.
+- API smoke query `select * from fact_trips` returned HTTP `400`.
+
 ## Last Verified MVP State
 
 Last local end-to-end verification: `2026-04-22`.

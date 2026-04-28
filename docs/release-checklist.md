@@ -1,6 +1,6 @@
 # Release Checklist
 
-Verification date: `2026-04-27`
+Verification date: `2026-04-28`
 
 Use this checklist before a thesis defense, final submission, or handoff. It is
 designed for the current local-first MVP, not for production cloud deployment.
@@ -37,6 +37,8 @@ Before release:
 - `OPENAI_ANSWER_SYNTHESIS=false` unless the demo explicitly needs opt-in answer
   synthesis from executed rows.
 - Docker Desktop is running before Docker-based checks.
+- `docs/security-notes.md` is current for the release scope, implemented
+  guardrails, secret handling, OpenAI usage, and audit log retention.
 
 Known local ports:
 
@@ -100,6 +102,21 @@ docker compose exec airflow-scheduler python -c "import sys; sys.path.insert(0, 
 | Demo changes | Streamlit HTTP `200`; official demo scenario spot checks |
 | Docs-only changes | `python scripts/release_check.py`; terminology consistency review |
 | Final release | All standard verification checks plus official demo scenarios |
+
+## Security Review
+
+Before a defense or handoff, review `docs/security-notes.md` and confirm:
+
+- `.env` is local-only and not tracked.
+- Shared docs do not contain real `OPENAI_API_KEY` values or MinIO passwords.
+- `OPENAI_ANSWER_SYNTHESIS=false` unless opt-in answer synthesis is part of the
+  demo.
+- API audit logs do not contain sensitive user-entered prompt text before
+  sharing artifacts.
+- DML/DDL, Bronze/Silver access, invalid joins, and detailed wildcard queries
+  are still blocked by API smoke checks.
+- The API remains localhost-only unless simple API protection and matching demo
+  wiring are added and tested.
 
 ## API Smoke Checks
 
@@ -198,7 +215,8 @@ Before handoff:
 - `docs/development-roadmap.md` has explicit phase statuses.
 - `docs/runbook.md` records the latest verification results.
 - `docs/data-quality-report.md`, `docs/agent-evaluation.md`,
-  `docs/demo-scenarios.md`, and `docs/performance-report.md` are current.
+  `docs/demo-scenarios.md`, `docs/performance-report.md`, and
+  `docs/security-notes.md` are current.
 - No real secrets are committed or copied into release notes.
 - Known caveats are stated clearly, especially warning-only data anomalies and
   host-local dependency-gated tests.

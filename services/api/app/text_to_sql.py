@@ -111,10 +111,8 @@ def generate_common_mart_sql(*, question: str, catalog: SchemaResponse) -> str |
     year = _extract_year(normalized_question)
     where_clause = ""
     if year:
-        where_clause = (
-            f"\nWHERE pickup_date >= DATE '{year}-01-01'"
-            f"\n  AND pickup_date < DATE '{year + 1}-01-01'"
-        )
+        start_date, end_date = _date_range_for_year(normalized_question, year)
+        where_clause = f"\nWHERE pickup_date >= DATE '{start_date}'\n  AND pickup_date < DATE '{end_date}'"
 
     return (
         "SELECT\n"
@@ -138,7 +136,7 @@ def _normalize_question(question: str) -> str:
 
 def _is_monthly_service_comparison(question: str) -> bool:
     has_monthly_intent = any(token in question for token in ("month", "monthly", "thang"))
-    has_trip_intent = any(token in question for token in ("trip", "trips", "chuyen di", "luot"))
+    has_trip_intent = any(token in question for token in ("trip", "trips", "chuyen", "luot"))
     has_service_intent = (
         ("yellow" in question and "green" in question)
         or ("vang" in question and "xanh" in question)
@@ -156,6 +154,12 @@ def _extract_year(question: str) -> int | None:
     if not match:
         return None
     return int(match.group(1))
+
+
+def _date_range_for_year(question: str, year: int) -> tuple[str, str]:
+    if any(token in question for token in ("h1", "first half", "nua dau")):
+        return f"{year}-01-01", f"{year}-07-01"
+    return f"{year}-01-01", f"{year + 1}-01-01"
 
 
 def _has_execution_enabled_columns(

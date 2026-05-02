@@ -1,6 +1,6 @@
 # Demo Scenario Pack
 
-Last verified: `2026-04-26`
+Last verified: `2026-05-02`
 
 Defense dataset window: `2024-01-01` through `2024-06-30`
 
@@ -48,6 +48,9 @@ continuity; this is not multi-turn agent memory and is not sent to the API.
 - `D03` is the primary Vietnamese natural-language scenario.
 - `D05`, `D06`, and `D08` demonstrate that fact/dimension access is allowed only
   through semantic catalog tables, cataloged columns, and approved joins.
+- `D08` should show the dropoff-zone role explicitly with
+  `fact_trips.dropoff_zone_id = dim_zone.zone_id`; it should not reuse the
+  pickup-zone mart.
 - `D09` demonstrates safe clarification behavior for broad questions.
 - `D10` and `D11` demonstrate that the API does not expose raw lakehouse layers
   or uncontrolled detail queries.

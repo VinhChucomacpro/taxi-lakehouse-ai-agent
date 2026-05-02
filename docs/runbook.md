@@ -527,6 +527,87 @@ Next action:
 - Phase 22: run the official defense scenarios in order and refresh runbook
   evidence for the live demo rehearsal.
 
+## Last Verified Phase 22 Defense Rehearsal State
+
+Last Phase 22 verification: `2026-05-02`.
+
+Phase 22 outputs:
+
+- Refreshed `docs/demo-scenarios.md` verification date.
+- Hardened deterministic planner behavior in `services/api/app/agent.py` and
+  `services/api/app/text_to_sql.py` for the official defense prompts.
+- Added semantic catalog test coverage for the Vietnamese `2024-H1` monthly
+  service comparison prompt.
+
+Rehearsal fixes:
+
+- The Vietnamese monthly Yellow/Green comparison prompt now routes to
+  `gold_daily_kpis` and filters to `2024-01-01` through `2024-06-30`.
+- `H1`, `first half`, and Vietnamese `nửa đầu` phrasing now produce a first-half
+  date range instead of a full-year range.
+- Pickup borough demand uses the pickup-zone aggregate mart grouped by borough.
+- Dropoff borough demand uses `fact_trips` joined to `dim_zone` with
+  `fact_trips.dropoff_zone_id = dim_zone.zone_id`.
+
+Verification:
+
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- `GET http://localhost:8000/healthz` returned `status=ok`,
+  `duckdb_exists=true`, and `duckdb_connectable=true`.
+- `GET http://localhost:8000/api/v1/schema` returned the eight execution-enabled
+  Gold objects: two aggregate marts, `fact_trips`, and five dimensions.
+- Streamlit returned HTTP `200` at `http://localhost:8501`.
+- Airflow returned HTTP `200` at `http://localhost:8080/health`.
+- Demo app inspection confirmed the `2024-H1` SQL filters, official demo
+  prompts, `AI_HISTORY_KEY`, `render_ai_history`, `Show chart`, and `Export CSV`
+  are present.
+- API was restarted with `docker compose restart api` so the mounted planner
+  changes were loaded.
+- API rehearsal results:
+  - `D02`: valid `gold_daily_kpis` SQL returned HTTP `200` with rows.
+  - `D03`: Vietnamese monthly service comparison returned HTTP `200`, intent
+    `monthly_service_comparison`, table `gold_daily_kpis`, and a `2024-H1`
+    date filter.
+  - `D04`: top pickup zones returned HTTP `200` from `gold_zone_demand`.
+  - `D05`: vendor analysis returned HTTP `200` from `fact_trips` plus
+    `dim_vendor`.
+  - `D06`: payment distribution returned HTTP `200` from `fact_trips` plus
+    `dim_payment_type`.
+  - `D07`: pickup borough demand returned HTTP `200` from `gold_zone_demand`
+    grouped by borough.
+  - `D08`: dropoff borough demand returned HTTP `200` from `fact_trips` plus
+    `dim_zone` using the dropoff zone join role.
+  - `D09`: `trips` returned clarification with no rows and no SQL execution.
+  - `D10`: `select * from silver_trips_unified` returned HTTP `400`.
+  - `D11`: `select * from fact_trips` returned HTTP `400`.
+- `python -m pytest -p no:cacheprovider` returned `21 passed, 2 skipped`.
+- `python scripts/release_check.py` passed.
+
+Defense narrative:
+
+- MinIO is the Bronze source of truth; local `data/` files are ingestion cache
+  and development fallback files.
+- dbt moves data through `Bronze -> Silver -> Gold`; Gold contains both a star
+  schema and aggregate marts.
+- Aggregate marts are the fast path for common dashboard and agent questions;
+  controlled fact/dim queries handle vendor, payment, pickup role, and dropoff
+  role questions.
+- The read-only agent runs intent analysis, planning, SQL generation or SQL
+  override, guardrail validation, DuckDB execution, self-checks, and grounded
+  answer output with trace steps.
+- Guardrails block DML/DDL, Bronze/Silver access, unknown tables/columns,
+  invalid joins, missing join conditions, cartesian joins, and detailed
+  `SELECT *` on fact/dim tables.
+- Out-of-scope items remain FHV/HVFHV, streaming ingestion, write-capable
+  agents, multi-tenant or production auth, public cloud deployment, and new
+  agent frameworks.
+
+Next action:
+
+- Phase 23: add or document a low-risk consistency check between dbt Gold model
+  names and semantic catalog entries, then refresh skip documentation if needed.
+
 ## Last Verified Ask AI History Display
 
 Last verification: `2026-04-28`.

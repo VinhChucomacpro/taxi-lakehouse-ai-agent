@@ -967,30 +967,53 @@ Next step: Phase 22, Defense Rehearsal And Evidence Refresh.
 
 ## Phase 22: Defense Rehearsal And Evidence Refresh
 
-Status: planned.
+Status: completed on 2026-05-02.
 
 Goal: make the live defense/demo predictable using the fixed scenario pack.
 
-Required completion:
+Completed:
 
 - Run the official scenarios in `docs/demo-scenarios.md` in defense order.
 - Record fresh results in `docs/runbook.md`: API health, Streamlit, Airflow,
   valid Gold query, clarification behavior, and blocked-query behavior.
 - Confirm key demo prompts and SQL remain filtered to the Phase 12 defense
   window, `2024-01-01` through `2024-06-30`, when stable results are needed.
-- Prepare a short defense narrative for:
+- Fixed rehearsal issues in deterministic planning:
+  - Vietnamese H1 monthly Yellow/Green comparison now uses `gold_daily_kpis`
+    with a `2024-H1` date filter instead of falling through to LLM SQL.
+  - Pickup borough demand uses `gold_zone_demand` grouped by borough.
+  - Dropoff borough demand uses `fact_trips` joined to `dim_zone` through
+    `dropoff_zone_id`.
+- Prepared a short defense narrative for:
   - MinIO as Bronze source of truth.
   - Gold star schema plus aggregate marts.
   - Read-only agent workflow and guardrails.
   - Out-of-scope items: FHV/HVFHV, streaming, write-capable agents, production
     auth, cloud deployment, and new agent frameworks.
 
-Verification target:
+Verification:
 
 - The demo can be completed in 10-15 minutes without improvising prompts.
 - Runbook contains the latest evidence and caveats.
 - Ask AI history is presented as session-local display history, not multi-turn
   context memory.
+- `python -m pytest -p no:cacheprovider` returned `21 passed, 2 skipped`.
+- `python scripts/release_check.py` passed.
+- Docker API rehearsal passed for D02 through D11:
+  - D02 valid mart SQL returned HTTP `200`.
+  - D03 Vietnamese monthly comparison returned HTTP `200` from
+    `gold_daily_kpis`, filtered to `2024-01-01` through `2024-06-30`.
+  - D04 top pickup zones returned HTTP `200` from `gold_zone_demand`.
+  - D05 vendor analysis returned HTTP `200` from `fact_trips` plus
+    `dim_vendor`.
+  - D06 payment distribution returned HTTP `200` from `fact_trips` plus
+    `dim_payment_type`.
+  - D07 pickup borough demand returned HTTP `200` from `gold_zone_demand`.
+  - D08 dropoff borough demand returned HTTP `200` from `fact_trips` plus
+    `dim_zone` through `dropoff_zone_id`.
+  - D09 ambiguous `trips` returned clarification without rows.
+  - D10 Silver access returned HTTP `400`.
+  - D11 detailed fact wildcard returned HTTP `400`.
 
 Next step: Phase 23, Low-Risk Quality Gate Cleanup.
 

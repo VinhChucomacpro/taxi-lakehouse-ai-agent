@@ -118,3 +118,20 @@ def test_common_vietnamese_monthly_service_comparison_uses_daily_kpi_mart() -> N
     assert "JOIN" not in sql.upper()
     assert "2023-01-01" in sql
     assert "2024-01-01" in sql
+
+
+def test_vietnamese_h1_demo_prompt_uses_daily_kpi_mart() -> None:
+    catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
+
+    sql = generate_sql_with_openai(
+        question="So sánh số chuyến Yellow Taxi và Green Taxi theo tháng trong nửa đầu năm 2024",
+        catalog=catalog,
+        model="gpt-4.1-mini",
+        api_key="replace-me",
+        max_rows=100,
+    )
+
+    assert "FROM gold_daily_kpis" in sql
+    assert "JOIN" not in sql.upper()
+    assert "2024-01-01" in sql
+    assert "2024-07-01" in sql

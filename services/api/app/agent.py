@@ -423,8 +423,9 @@ def deterministic_sql_for_plan(
 
     normalized = normalize_question(question)
     year = extract_year(normalized)
+    date_filter = date_filter_for_question(normalized, year)
     if plan.intent == "monthly_trip_trend":
-        where_clause = f"\nWHERE d.year = {year}" if year else ""
+        where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
         return (
             "SELECT\n"
             "  d.month,\n"
@@ -440,6 +441,7 @@ def deterministic_sql_for_plan(
         )
 
     if plan.intent == "zone_demand":
+        where_clause = f"\nWHERE {date_filter}" if date_filter else ""
         return (
             "SELECT\n"
             "  zone_name,\n"
@@ -447,11 +449,40 @@ def deterministic_sql_for_plan(
             "  SUM(trip_count) AS trip_count,\n"
             "  SUM(total_amount) AS total_amount\n"
             "FROM gold_zone_demand\n"
+            f"{where_clause}\n"
             "GROUP BY zone_name, borough\n"
             "ORDER BY trip_count DESC"
         )
 
+    if plan.intent == "pickup_borough_demand":
+        where_clause = f"\nWHERE {date_filter}" if date_filter else ""
+        return (
+            "SELECT\n"
+            "  borough,\n"
+            "  SUM(trip_count) AS trip_count,\n"
+            "  SUM(total_amount) AS total_amount\n"
+            "FROM gold_zone_demand\n"
+            f"{where_clause}\n"
+            "GROUP BY borough\n"
+            "ORDER BY trip_count DESC"
+        )
+
+    if plan.intent == "dropoff_borough_demand":
+        where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
+        return (
+            "SELECT\n"
+            "  z.borough,\n"
+            "  COUNT(*) AS trip_count,\n"
+            "  SUM(f.total_amount) AS total_amount\n"
+            "FROM fact_trips AS f\n"
+            "JOIN dim_zone AS z ON f.dropoff_zone_id = z.zone_id\n"
+            f"{where_clause}\n"
+            "GROUP BY z.borough\n"
+            "ORDER BY trip_count DESC"
+        )
+
     if plan.intent == "vendor_analysis":
+        where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
         return (
             "SELECT\n"
             "  v.vendor_name,\n"
@@ -459,11 +490,13 @@ def deterministic_sql_for_plan(
             "  SUM(f.total_amount) AS total_amount\n"
             "FROM fact_trips AS f\n"
             "JOIN dim_vendor AS v ON f.vendor_id = v.vendor_id\n"
+            f"{where_clause}\n"
             "GROUP BY v.vendor_name\n"
             "ORDER BY trip_count DESC"
         )
 
     if plan.intent == "payment_analysis":
+        where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
         return (
             "SELECT\n"
             "  p.payment_type_name,\n"
@@ -471,6 +504,7 @@ def deterministic_sql_for_plan(
             "  SUM(f.total_amount) AS total_amount\n"
             "FROM fact_trips AS f\n"
             "JOIN dim_payment_type AS p ON f.payment_type = p.payment_type\n"
+            f"{where_clause}\n"
             "GROUP BY p.payment_type_name\n"
             "ORDER BY trip_count DESC"
         )
@@ -495,6 +529,24 @@ def build_query_plan(question: str, catalog: SchemaResponse) -> QueryPlan:
             selected_tables=["fact_trips", "dim_date"],
             reason="Monthly trip trend needs calendar grouping over the trip fact table.",
             expected_groupings=["month"],
+        )
+
+    if has_dropoff_intent(question) and has_zone_intent(question):
+        return QueryPlan(
+            intent="dropoff_borough_demand",
+            surface="star_schema",
+            selected_tables=["fact_trips", "dim_zone"],
+            reason="Dropoff geography requires fact_trips joined to dim_zone through dropoff_zone_id.",
+            expected_groupings=["borough"],
+        )
+
+    if has_borough_intent(question) and has_pickup_intent(question):
+        return QueryPlan(
+            intent="pickup_borough_demand",
+            surface="aggregate_mart",
+            selected_tables=["gold_zone_demand"],
+            reason="Pickup borough demand can use the curated pickup zone demand mart.",
+            expected_groupings=["borough"],
         )
 
     if has_zone_intent(question):
@@ -588,7 +640,7 @@ def has_monthly_intent(question: str) -> bool:
 
 
 def has_trip_intent(question: str) -> bool:
-    return any(token in question for token in ("trip", "trips", "chuyen di", "luot"))
+    return any(token in question for token in ("trip", "trips", "chuyen", "luot"))
 
 
 def has_service_intent(question: str) -> bool:
@@ -601,6 +653,18 @@ def has_service_intent(question: str) -> bool:
 
 def has_zone_intent(question: str) -> bool:
     return any(token in question for token in ("zone", "borough", "pickup zone", "khu vuc", "diem don"))
+
+
+def has_borough_intent(question: str) -> bool:
+    return "borough" in question
+
+
+def has_pickup_intent(question: str) -> bool:
+    return any(token in question for token in ("pickup", "diem don"))
+
+
+def has_dropoff_intent(question: str) -> bool:
+    return any(token in question for token in ("dropoff", "diem tra"))
 
 
 def has_vendor_intent(question: str) -> bool:
@@ -616,6 +680,14 @@ def extract_year(question: str) -> int | None:
     if not match:
         return None
     return int(match.group(1))
+
+
+def date_filter_for_question(question: str, year: int | None) -> str:
+    if year is None:
+        return ""
+    if any(token in question for token in ("h1", "first half", "nua dau")):
+        return f"pickup_date >= DATE '{year}-01-01' AND pickup_date < DATE '{year}-07-01'"
+    return f"pickup_date >= DATE '{year}-01-01' AND pickup_date < DATE '{year + 1}-01-01'"
 
 
 def extract_sql(content: str) -> str:

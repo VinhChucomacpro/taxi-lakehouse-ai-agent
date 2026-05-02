@@ -212,6 +212,7 @@ smoke checks before presenting the project.
 
 Before handoff:
 
+- Final handoff snapshot tag: `thesis-final-handoff-2026-05-02`.
 - `docs/development-roadmap.md` has explicit phase statuses.
 - `docs/runbook.md` records the latest verification results.
 - `docs/data-quality-report.md`, `docs/agent-evaluation.md`,

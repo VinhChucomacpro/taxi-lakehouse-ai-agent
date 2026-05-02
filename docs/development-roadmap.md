@@ -929,28 +929,39 @@ Next step: Phase 21, Final Handoff Snapshot.
 
 ## Phase 21: Final Handoff Snapshot
 
-Status: planned.
+Status: completed on 2026-05-02.
 
 Goal: create a traceable final submission snapshot after the Phase 20 freeze.
 
-Required completion:
+Completed:
 
-- Commit the Phase 19-20 security, freeze, and Ask AI history display changes.
-- Record the final commit hash or git tag used for thesis submission in the
-  roadmap and runbook.
-- Rerun the release checks:
-  - `python scripts/release_check.py`
-  - `python -m pytest -p no:cacheprovider`
-  - Docker smoke checks from `docs/release-checklist.md`
-- Do not change API contracts, dbt models, semantic catalog, or guardrail policy
-  unless verification fails and a fix is required.
+- Confirmed the Phase 20 freeze and Ask AI history display work had already
+  been committed in `5ae47d6079b94c2ccaf1fe954358f2ec4dde2dd5`
+  (`Finalize roadmap and demo history`).
+- Recorded the final handoff snapshot tag:
+  `thesis-final-handoff-2026-05-02`.
+- Reran release checks, host tests, Docker stack startup, service health checks,
+  and API release smoke checks.
+- Kept API contracts, dbt models, semantic catalog, and guardrail policy
+  unchanged.
 
-Verification target:
+Verification:
 
-- The repository has a clear final commit or tag.
-- README, roadmap, runbook, and release checklist describe the same final
-  state.
-- The local Docker stack starts and the official demo entry points respond.
+- `python scripts/release_check.py` passed.
+- `python -m pytest -p no:cacheprovider` returned `20 passed, 2 skipped`; the
+  skipped tests remain the known host dependency-gated API and SQL guardrail
+  tests.
+- `docker compose up -d` started the existing stack without rebuild after Docker
+  Desktop was available.
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- API `/healthz` returned `status=ok`, `duckdb_exists=true`, and
+  `duckdb_connectable=true`.
+- Streamlit returned HTTP `200`.
+- Airflow `/health` returned HTTP `200`.
+- Release API smoke checks returned HTTP `200` for a valid
+  `gold_daily_kpis` query, HTTP `400` for `drop table gold_daily_kpis`, and
+  HTTP `400` for `select * from fact_trips`.
 
 Next step: Phase 22, Defense Rehearsal And Evidence Refresh.
 

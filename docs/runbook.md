@@ -483,6 +483,50 @@ Next action:
 - Commit the freeze changes and record the final commit hash or tag used for
   thesis submission.
 
+## Last Verified Phase 21 Final Handoff Snapshot
+
+Last Phase 21 verification: `2026-05-02`.
+
+Final handoff identifiers:
+
+- Phase 20 freeze commit verified before this handoff:
+  `5ae47d6079b94c2ccaf1fe954358f2ec4dde2dd5`
+- Final handoff snapshot tag: `thesis-final-handoff-2026-05-02`
+
+Implemented behavior:
+
+- Phase 21 records a traceable thesis handoff snapshot after the Phase 20
+  freeze.
+- No API contract, dbt model, semantic catalog, or guardrail policy changes were
+  made.
+- The handoff state keeps the documented `2024-H1` defense dataset window and
+  fixed demo scenario pack.
+
+Verification:
+
+- `python scripts/release_check.py` passed.
+- `python -m pytest -p no:cacheprovider` returned `20 passed, 2 skipped`.
+- The skipped tests are the known host dependency-gated API and SQL guardrail
+  tests.
+- Docker Desktop needed to be started before Docker CLI checks could run.
+- `docker compose up -d` started the existing stack without rebuild.
+- `docker compose ps` showed Postgres, MinIO, API, demo, Airflow scheduler, and
+  Airflow webserver running.
+- `GET http://localhost:8000/healthz` returned `status=ok`,
+  `duckdb_exists=true`, and `duckdb_connectable=true`.
+- Streamlit returned HTTP `200` at `http://localhost:8501`.
+- Airflow returned HTTP `200` at `http://localhost:8080/health` after the
+  freshly started webserver finished warming up.
+- Release API smoke checks returned:
+  - HTTP `200` for a valid `gold_daily_kpis` query filtered to `2024-H1`
+  - HTTP `400` for `drop table gold_daily_kpis`
+  - HTTP `400` for `select * from fact_trips`
+
+Next action:
+
+- Phase 22: run the official defense scenarios in order and refresh runbook
+  evidence for the live demo rehearsal.
+
 ## Last Verified Ask AI History Display
 
 Last verification: `2026-04-28`.

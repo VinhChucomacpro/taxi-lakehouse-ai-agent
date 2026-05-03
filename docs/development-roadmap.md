@@ -1056,32 +1056,163 @@ Next step: Phase 24, Post-Thesis Extension Decision Gate.
 
 ## Phase 24: Post-Thesis Extension Decision Gate
 
-Status: planned.
+Status: completed on 2026-05-03.
 
 Goal: choose exactly one post-thesis extension path before implementing new
 scope.
 
+Selected direction:
+
+- Agent extension: improve deterministic planner and evaluation coverage while
+  preserving read-only, Gold-only, framework-light behavior.
+
+Deferred directions:
+
+- Public demo hardening remains deferred because the current project target is
+  still local-first and localhost-only.
+- Performance extension remains deferred until new benchmark evidence shows a
+  concrete latency problem.
+- Data extension remains deferred to avoid widening the stable Yellow/Green MVP
+  with FHV/HVFHV or new reference datasets before a separate data-scope phase.
+
+Completed:
+
+- Chose exactly one post-thesis direction before implementation.
+- Kept the Phase 20 thesis MVP, Phase 21 handoff tag, and Phase 22/23 defense
+  evidence as the stable baseline.
+- Defined the next implementation phase around agent coverage rather than new
+  data sources, production auth, materialization changes, or new agent
+  frameworks.
+
+Verification:
+
+- This was a docs-only decision gate; no API contract, dbt model, semantic
+  catalog, guardrail policy, or Docker runtime behavior changed.
+- `python scripts/release_check.py` should remain the required verification for
+  this docs-only phase.
+
+Next step: Phase 25, Pipeline Reality Hardening.
+
+## Phase 25: Pipeline Reality Hardening
+
+Status: in progress on 2026-05-03.
+
+Goal: close the gap between the current local-first MVP pipeline and a more
+realistic operational batch pipeline, without changing the in-scope data sources
+or the read-only Gold query surface.
+
+Reality assessment:
+
+- Implemented with real data flow: Airflow builds monthly manifests, downloads
+  official TLC Yellow/Green files, uploads Bronze objects to MinIO, runs dbt
+  `Bronze -> Silver -> Gold`, and serves Gold through DuckDB/API.
+- Still local-first by design: Docker Compose, local MinIO disk, local DuckDB,
+  localhost services, and local `.env` secrets remain MVP constraints.
+- Phase 25 code now covers several previously temporary pieces:
+  `publish_metadata` writes local and MinIO metadata JSON, ingestion uses atomic
+  local downloads, new Bronze uploads carry file metadata, existing objects are
+  classified as verified or unverified, source `403/404` responses distinguish
+  recent publication lag from historical gaps, and dbt builds return
+  `run_results.json` summaries. Remaining gaps are Docker/Airflow verification
+  of the metadata object, threshold tuning for warning-only anomaly tests, and
+  the known host-local dependency-gated API/guardrail skips.
+
+Superseded next step:
+
+- Phase 24 selected the agent extension path. The current priority is redirected
+  to pipeline hardening before additional agent coverage, because operational
+  trust in ingestion and transformation is the stronger foundation.
+
 Required completion:
 
-- Select one extension direction:
-  - Public demo hardening: API key/basic auth, matching Streamlit wiring, simple
-    rate limiting, and deployment-managed secrets.
-  - Performance extension: rerun benchmarks and materialize aggregate marts only
-    if timing evidence justifies it.
-  - Data extension: evaluate FHV/HVFHV or new reference datasets with ingestion,
-    dbt, contracts, tests, and docs updated together.
-  - Agent extension: improve planner/evaluation coverage while preserving
-    read-only, Gold-only, framework-light behavior.
-- Update the roadmap with the selected direction before implementation.
-- Keep the Phase 20 thesis MVP reproducible while extension work happens.
+1. Replace or implement `publish_metadata`:
+   - persist one pipeline run summary per Airflow DAG run
+   - include run id, scheduled/manual mode, target months, source URLs, Bronze
+     object keys, statuses, file sizes, checksums, dbt result summary, and
+     timestamps
+   - store the summary in a durable local-first location such as MinIO
+     `metadata/pipeline_runs/...` and/or a DuckDB operational table
+2. Strengthen ingestion idempotency:
+   - download to a temporary file and atomically promote it after size/checksum
+     validation
+   - record SHA-256 for every uploaded object
+   - when a Bronze object already exists, verify recorded size/checksum when
+     metadata is available instead of blindly trusting existence
+   - document the reingestion policy for changed or corrupted source files
+3. Add source availability and completeness checks:
+   - record `403/404` unpublished files as explicit skipped source events
+   - fail or warn clearly when an expected historical month is missing after the
+     TLC publication window
+   - keep scheduled lookback behavior, but distinguish normal publication lag
+     from real ingestion gaps
+4. Make dbt execution evidence durable:
+   - capture dbt `run_results.json` summary after Bronze/Silver and Gold builds
+   - record pass, warn, error, and skipped counts in the pipeline run summary
+   - keep dbt artifacts generated locally, not committed to git
+5. Define quality gates:
+   - keep blocking tests for structural correctness and relationships
+   - define explicit thresholds or review rules for warning-only anomaly tests
+   - document which warnings can pass a demo run and which require investigation
+6. Improve operational recovery:
+   - add or document a safe monthly backfill procedure
+   - add Airflow retries where network download/upload failures are transient
+   - add smoke checks that confirm MinIO Bronze objects, DuckDB Gold objects,
+     and API health after a successful pipeline run
+7. Keep scope boundaries:
+   - no FHV/HVFHV, streaming, write-capable agent behavior, production auth, or
+     cloud deployment in this phase
+   - do not materialize Gold marts unless new benchmark evidence justifies it
 
 Verification target:
 
-- Scope is explicitly chosen before code changes start.
-- New interface, model, or data-source changes include tests and docs.
-- The frozen thesis MVP remains runnable from documented instructions.
+- Ingestion unit tests cover metadata publishing, atomic download behavior,
+  existing-object validation, and skipped-source handling.
+- dbt build still passes through the Airflow scheduler container.
+- A manual DAG run for one known month produces Bronze objects, dbt results,
+  Gold rows, and a durable pipeline run summary.
+- `python scripts/release_check.py` confirms dbt artifacts such as `dbt/target`
+  are not tracked.
+- API smoke checks still pass for valid Gold query, blocked DDL, and blocked
+  detailed wildcard query.
 
-Next step: post-thesis implementation only after Phase 24 chooses a direction.
+Next step after Phase 25: revisit Agent Planner And Evaluation Coverage only
+after pipeline run evidence is durable and repeatable.
+
+Progress on 2026-05-03:
+
+- Added `airflow/dags/lib/pipeline_metadata.py` for pipeline run summary JSON,
+  metadata object keys, MinIO upload, and quality gate evaluation.
+- Replaced the Airflow `publish_metadata` placeholder with a real task that
+  writes local metadata and uploads the run summary to MinIO.
+- Made ingestion downloads atomic through temporary files before final local
+  cache promotion.
+- Added object metadata for new Bronze uploads and checksum-aware existing
+  object classification.
+- Added source availability classification for recent TLC publication lag versus
+  historical missing source.
+- Updated dbt runner behavior so Airflow dbt tasks return parsed
+  `target/run_results.json` summaries.
+- Added release hygiene checking so tracked `dbt/target` artifacts fail the
+  release check.
+- Updated data contracts, runbook, release checklist, and `.env.example`.
+
+Verification on 2026-05-03:
+
+- `python -m pytest -p no:cacheprovider tests/test_pipeline_metadata.py
+  tests/test_tlc_ingestion.py tests/test_dbt_runner.py` returned `29 passed`.
+- `python -m pytest -p no:cacheprovider` returned `35 passed, 2 skipped`.
+- `python scripts/release_check.py` passed.
+- AST parse passed for changed Python files; `py_compile` was not used because
+  Windows denied writes to the existing `airflow/dags/__pycache__` directory.
+
+Remaining:
+
+- Run Docker/Airflow manual DAG verification for a known month.
+- Confirm MinIO metadata JSON exists under
+  `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
+- Confirm metadata contains ingestion statuses, checksums, dbt counts, and
+  quality gate status.
+- Run API smoke checks after the Airflow run.
 
 ## Documentation And Handoff Rule
 

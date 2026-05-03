@@ -14,12 +14,22 @@
   fallback, not as the primary dbt Bronze source.
 - Store files in partitioned paths by service type, year, and month.
 - Keep naming close to the original TLC source names.
+- Download files through a temporary local path, validate non-empty file size and
+  SHA-256, then atomically promote the file to the final local cache path before
+  upload.
+- Upload Bronze objects with object metadata when available: SHA-256, file size,
+  source URL, dataset, service type, source year/month, and ingestion timestamp.
+- Existing Bronze objects are not overwritten by default. If object metadata is
+  present, ingestion validates that recorded size matches object size and marks
+  the object as verified; older objects without metadata are marked unverified.
 
 Expected MinIO object paths:
 
 - `s3://taxi-lakehouse/bronze/yellow_taxi/year=YYYY/month=MM/...`
 - `s3://taxi-lakehouse/bronze/green_taxi/year=YYYY/month=MM/...`
 - `s3://taxi-lakehouse/reference/taxi_zone_lookup/taxi_zone_lookup.csv`
+- `s3://taxi-lakehouse/metadata/pipeline_runs/taxi_monthly_pipeline/...`
+  for durable local-first pipeline run summaries
 
 Expected local cache paths:
 

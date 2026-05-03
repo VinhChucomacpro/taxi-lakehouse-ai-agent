@@ -19,15 +19,19 @@ read-only AI query agent over curated Gold data.
 
 1. Airflow builds monthly manifests for Yellow Taxi, Green Taxi, and Taxi Zone
    Lookup.
-2. Ingestion downloads each source file to local `data/` as a temporary cache.
-3. Ingestion uploads the same file to MinIO under stable Bronze object keys.
+2. Ingestion downloads each source file to local `data/` through a temporary
+   file, validates file size and SHA-256, then atomically promotes it as cache.
+3. Ingestion uploads the same file to MinIO under stable Bronze object keys with
+   file metadata when available.
 4. dbt Bronze models read from MinIO `s3://taxi-lakehouse/...` paths using
    DuckDB `httpfs`.
 5. dbt builds Silver normalized trip data and Gold star-schema models/marts in
    DuckDB.
-6. FastAPI runs the read-only agent workflow and executes validated SQL against
+6. Airflow publishes pipeline run metadata JSON locally and under MinIO
+   `metadata/pipeline_runs/...`, including ingestion statuses and dbt summaries.
+7. FastAPI runs the read-only agent workflow and executes validated SQL against
    curated Gold data through read-only DuckDB access.
-7. Streamlit displays agent traces, answers, SQL, tables, charts, and CSV
+8. Streamlit displays agent traces, answers, SQL, tables, charts, and CSV
    exports for local demos.
 
 ## Storage Roles

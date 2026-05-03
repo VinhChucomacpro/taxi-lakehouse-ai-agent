@@ -42,10 +42,14 @@
 - Scheduled ingestion runs on day 15 each month and checks the previous
   `TLC_LOOKBACK_MONTHS` months, default `3`, to handle TLC's delayed
   publication cadence.
-- Existing Bronze objects in MinIO are skipped before download. New source files
-  are downloaded and uploaded to Bronze. Unpublished TLC source files returning
-  HTTP `403` or `404` are recorded as `skipped_source_unavailable` instead of
-  failing the whole DAG.
+- Existing Bronze objects in MinIO are classified before download. Objects with
+  matching file-size/checksum metadata are marked `skipped_existing_verified`;
+  older objects without metadata are marked `skipped_existing_unverified`.
+  New source files download through a temporary local file, validate file size
+  and SHA-256, then atomically promote before upload to Bronze. Unpublished TLC
+  source files returning HTTP `403` or `404` are recorded as
+  `skipped_source_unavailable_recent` inside `TLC_PUBLICATION_GRACE_MONTHS`, or
+  `failed_source_missing_historical` outside that grace period.
 - Manual DAG triggers with explicit `year` and `month` ingest exactly the
   requested month.
 - Taxi Zone Lookup is ingested separately as reference data for enrichment.
@@ -56,6 +60,9 @@
   are cache/fallback files.
 - Airflow runs `dbt build` inside the scheduler/webserver image using `dbt-duckdb`.
 - The local `Bronze -> Silver -> Gold` path can be validated with `dbt build`.
+- Airflow publishes a local-first pipeline run metadata JSON locally under
+  `data/metadata/pipeline_runs/...` and in MinIO under
+  `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
 - The read-only agent API plans natural-language questions over curated Gold,
   validates SQL with `sqlglot`, only allows read-only `SELECT` statements, runs
   self-checks, and executes against DuckDB in read-only mode.
@@ -652,6 +659,167 @@ Next action:
 
 - Phase 24: choose exactly one post-thesis extension direction before changing
   scope.
+
+## Last Verified Phase 24 Post-Thesis Decision Gate
+
+Last Phase 24 verification: `2026-05-03`.
+
+Phase 24 output:
+
+- `docs/development-roadmap.md` now records the selected post-thesis extension
+  direction.
+- `docs/release-checklist.md` now includes a post-thesis extension gate note.
+
+Selected direction:
+
+- Agent extension: improve deterministic planner and evaluation coverage while
+  preserving read-only, Gold-only, framework-light behavior.
+
+Deferred directions:
+
+- Public demo hardening remains deferred because the current release target is
+  local-first and localhost-only.
+- Performance materialization remains deferred until new benchmark evidence
+  justifies it.
+- Data extension remains deferred to avoid widening the stable Yellow/Green MVP
+  before a separate data-scope phase.
+
+Operational notes:
+
+- Phase 24 was a docs-only decision gate.
+- No API contract, dbt model, semantic catalog, guardrail policy, Docker image,
+  or local runtime behavior changed.
+- The original Phase 24 agent-extension next step was superseded by the
+  pipeline reality assessment below.
+
+Verification:
+
+- `python scripts/release_check.py` passed.
+
+Next action:
+
+- Phase 25: harden the pipeline's operational evidence before adding more agent
+  coverage.
+
+## Pipeline Reality Assessment
+
+Last assessment: `2026-05-03`.
+
+Conclusion:
+
+- The pipeline uses real TLC source files and a real local lakehouse flow:
+  Airflow manifest preparation, download, MinIO Bronze upload, dbt
+  `Bronze -> Silver -> Gold`, DuckDB serving, and FastAPI/Streamlit access.
+- It is realistic for a local-first thesis/product MVP, but not yet equivalent
+  to an operational production batch pipeline.
+
+Implemented realistic behavior:
+
+- Monthly Airflow schedule on day 15 with `TLC_LOOKBACK_MONTHS` for delayed TLC
+  publication.
+- Manual Airflow trigger with explicit `year` and `month` for exact backfill.
+- Bronze object paths preserve `year=YYYY/month=MM` partition semantics.
+- Existing MinIO objects are skipped before redownload.
+- Unpublished source files returning `403` or `404` are skipped without failing
+  the whole scheduled run.
+- dbt Bronze models read from MinIO S3-compatible paths, not local cache paths.
+- Silver applies validity filters; Gold star schema and marts are tested and
+  served through the read-only agent.
+
+Remaining temporary or incomplete operational pieces:
+
+- Docker/Airflow verification for the new `publish_metadata` task remains
+  pending.
+- Ingestion results now flow into durable metadata JSON, but a fresh manual DAG
+  run still needs to confirm the object appears in MinIO.
+- Existing Bronze object validation is checksum-aware when object metadata is
+  present; older pre-Phase 25 objects without metadata are still classified as
+  unverified rather than rehashed from MinIO.
+- `403/404` handling now distinguishes normal recent-month publication lag from
+  historical missing sources; operational thresholds may still be tuned after a
+  Docker/Airflow run.
+- Warning-only anomaly tests are documented, but thresholds and escalation rules
+  are not yet formalized as operational policy.
+- The environment remains local-first: Docker Compose, local MinIO disk, local
+  DuckDB, localhost services, and local `.env` secrets.
+
+Phase 25 handling plan:
+
+1. Implement durable run metadata in the `publish_metadata` step. Completed in
+   code on `2026-05-03`; Docker/Airflow run verification remains pending.
+2. Strengthen ingestion idempotency with atomic downloads and checksum-aware
+   existing-object validation. Completed in unit-tested code on `2026-05-03`.
+3. Add source completeness checks that separate expected TLC publication delay
+   from stale missing months. Completed in unit-tested code on `2026-05-03`.
+4. Persist dbt run summaries into the pipeline run metadata. Completed in
+   unit-tested code on `2026-05-03`; Docker/Airflow run verification remains
+   pending.
+5. Formalize quality-gate thresholds for warning-only anomaly tests. Initial
+   quality gate summary completed; detailed anomaly thresholds remain a future
+   tightening step.
+6. Document and test safe monthly backfill/recovery. Backfill policy documented
+   below; Docker/Airflow run verification remains pending.
+7. Keep the current MVP scope unchanged: Yellow, Green, Taxi Zone Lookup, local
+   MinIO/DuckDB, and read-only Gold serving.
+
+Implemented Phase 25 behavior:
+
+- `publish_metadata` is now an Airflow task that writes a JSON summary locally
+  under `data/metadata/pipeline_runs/...` and uploads the same summary to MinIO
+  under `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
+- Pipeline run summaries include DAG/run identity, run mode, logical date,
+  target months, ingestion results, dbt result summaries, quality gate status,
+  and creation timestamp.
+- Ingestion downloads to a temporary file, validates file size and SHA-256, then
+  atomically promotes to the final local cache path.
+- Uploaded Bronze objects include S3-compatible object metadata for checksum,
+  file size, source URL, dataset, source month, and ingestion timestamp when
+  available.
+- Existing Bronze objects are classified as:
+  - `skipped_existing_verified` when size and checksum metadata are present and
+    internally consistent
+  - `skipped_existing_unverified` for older objects without metadata
+  - blocking error when stored metadata conflicts with object size or source URL
+- TLC `403/404` source responses are classified as:
+  - `skipped_source_unavailable_recent` inside
+    `TLC_PUBLICATION_GRACE_MONTHS`
+  - `failed_source_missing_historical` outside that grace window
+- dbt builds now return summaries parsed from `target/run_results.json`.
+- Quality gate status is summarized as `passed`, `passed_with_warnings`, or
+  `failed_blocking`.
+
+Backfill and recovery policy:
+
+- Manual DAG trigger with `{"year": YYYY, "month": M}` remains the supported
+  exact-month backfill path.
+- Existing Bronze objects are not overwritten by default.
+- If a historical source is unavailable beyond `TLC_PUBLICATION_GRACE_MONTHS`,
+  treat it as an ingestion gap that requires investigation.
+- If existing object metadata conflicts with object size or source URL, do not
+  silently overwrite. Investigate the object and source first; a future explicit
+  `force_reingest` workflow can be added if controlled overwrite becomes
+  necessary.
+- After a backfill run, verify MinIO Bronze objects, the pipeline metadata JSON,
+  dbt build results, Gold row availability for the target month, API health, and
+  blocked unsafe SQL.
+
+Phase 25 local verification:
+
+- `python -m pytest -p no:cacheprovider tests/test_pipeline_metadata.py
+  tests/test_tlc_ingestion.py tests/test_dbt_runner.py` returned `29 passed`.
+- `python -m pytest -p no:cacheprovider` returned `35 passed, 2 skipped`.
+- `python scripts/release_check.py` passed after adding the artifact hygiene
+  check.
+- AST parse passed for changed Python files after `py_compile` could not write
+  into the existing Windows `airflow/dags/__pycache__` directory.
+
+Remaining Phase 25 verification:
+
+- Run a Docker/Airflow manual DAG for a known month.
+- Confirm MinIO contains `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
+- Confirm the metadata JSON includes ingestion statuses, checksums, dbt counts,
+  and quality gate status.
+- Confirm API smoke checks still pass after the run.
 
 ## Last Verified Ask AI History Display
 

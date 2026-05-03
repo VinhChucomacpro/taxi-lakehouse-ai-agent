@@ -55,8 +55,9 @@ graduation project without adding unnecessary agent frameworks.
 - Gold models are configured as views. This is simple and transparent, but the
   project should evaluate materializing large Gold objects if demo latency or
   repeated queries become a problem.
-- The Airflow DAG has a `publish_metadata` placeholder. It should either publish
-  useful run metadata or be removed from the defense narrative.
+- The Airflow DAG now has a real `publish_metadata` task that writes local JSON
+  pipeline run summaries and uploads them to MinIO. Docker/Airflow verification
+  for a fresh manual run remains the open Phase 25 check.
 - Some API and guardrail tests can skip when optional dependencies are missing.
   A defense verification environment should install the full project dependency
   set and record non-skipped test results.

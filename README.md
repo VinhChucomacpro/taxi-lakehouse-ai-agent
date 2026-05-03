@@ -12,6 +12,9 @@ product-style demo, không phải production cloud system.
 - Taxi Zone Lookup làm reference enrichment dataset.
 - MinIO làm Bronze object-storage source of truth.
 - dbt transformation `Bronze -> Silver -> Gold`.
+- Phase 25 pipeline hardening: atomic downloads, checksum-aware Bronze
+  idempotency, source availability classification, dbt run summaries, and
+  pipeline run metadata under MinIO `metadata/pipeline_runs/...`.
 - Gold star schema: `fact_trips`, `dim_date`, `dim_zone`,
   `dim_service_type`, `dim_vendor`, `dim_payment_type`.
 - Gold aggregate marts: `gold_daily_kpis`, `gold_zone_demand`.
@@ -45,12 +48,16 @@ Core stack:
 Data flow:
 
 1. Airflow tạo manifest cho Yellow, Green, and Taxi Zone Lookup.
-2. Source files được download vào local `data/` như cache.
-3. Ingestion upload cùng object key vào MinIO bucket `taxi-lakehouse`.
+2. Source files được download vào local `data/` như cache qua temp file, sau đó
+   validate size/SHA-256 và atomic promote.
+3. Ingestion upload cùng object key vào MinIO bucket `taxi-lakehouse`, kèm file
+   metadata khi có.
 4. dbt Bronze đọc từ MinIO qua DuckDB `httpfs`.
 5. dbt xây Silver unified trips và Gold serving models trong DuckDB.
-6. FastAPI chỉ execute validated read-only SQL trên curated Gold objects.
-7. Streamlit hiển thị answer, trace, SQL, table, chart, and export.
+6. Airflow publish pipeline run metadata JSON vào
+   `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
+7. FastAPI chỉ execute validated read-only SQL trên curated Gold objects.
+8. Streamlit hiển thị answer, trace, SQL, table, chart, and export.
 
 Bronze object paths:
 
@@ -58,6 +65,7 @@ Bronze object paths:
 s3://taxi-lakehouse/bronze/yellow_taxi/year=YYYY/month=MM/yellow_tripdata_YYYY-MM.parquet
 s3://taxi-lakehouse/bronze/green_taxi/year=YYYY/month=MM/green_tripdata_YYYY-MM.parquet
 s3://taxi-lakehouse/reference/taxi_zone_lookup/taxi_zone_lookup.csv
+s3://taxi-lakehouse/metadata/pipeline_runs/taxi_monthly_pipeline/...
 ```
 
 ## Phạm Vi

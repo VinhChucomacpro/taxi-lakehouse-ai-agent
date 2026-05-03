@@ -29,6 +29,7 @@ REQUIRED_ENV_KEYS = [
     "MINIO_ROOT_PASSWORD",
     "MINIO_ENDPOINT",
     "MINIO_BUCKET",
+    "TLC_PUBLICATION_GRACE_MONTHS",
     "DUCKDB_PATH",
     "QUERY_AUDIT_LOG_PATH",
     "OPENAI_API_KEY",
@@ -56,6 +57,7 @@ def main() -> int:
         check_runbook_ports,
         check_release_checklist,
         check_gold_catalog_consistency,
+        check_no_tracked_dbt_artifacts,
         check_no_tracked_env,
         check_no_obvious_doc_secrets,
     ]
@@ -176,6 +178,22 @@ def check_no_tracked_env() -> list[str]:
         if line.strip() and line.strip() != ".env.example"
     ]
     return [f"Environment file is tracked and should not be: {path}" for path in tracked]
+
+
+def check_no_tracked_dbt_artifacts() -> list[str]:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "dbt/target"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return [f"Could not inspect tracked dbt artifacts: {exc}"]
+
+    tracked = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return [f"Generated dbt artifact is tracked and should not be: {path}" for path in tracked]
 
 
 def check_no_obvious_doc_secrets() -> list[str]:

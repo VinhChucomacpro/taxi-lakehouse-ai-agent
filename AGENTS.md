@@ -67,8 +67,10 @@ agent framework unless the user explicitly asks for that change.
 - Text-to-SQL prompt generation remains one component behind
   `services/api/app/agent.py`; API endpoints should call the orchestrator, not
   the prompt renderer directly.
-- The next major direction is demo hardening, thesis-readiness verification,
-  and optional performance/materialization cleanup.
+- The current major direction is Phase 25 pipeline reality hardening: durable
+  pipeline run metadata, atomic ingestion downloads, checksum-aware Bronze
+  idempotency, source completeness classification, dbt run summaries, and
+  Docker/Airflow verification of those operational signals.
 
 ## Local Environment Notes
 
@@ -100,6 +102,10 @@ agent framework unless the user explicitly asks for that change.
   `TLC_LOOKBACK_MONTHS` months, default `3`, to account for TLC's delayed
   monthly data publication. Manual `year/month` DAG triggers ingest exactly the
   requested month.
+- Phase 25 ingestion hardening writes downloads through temporary files before
+  atomic local promotion, uploads Bronze objects with file metadata when
+  available, classifies existing objects as verified or unverified, and records
+  pipeline run summaries under MinIO `metadata/pipeline_runs/...`.
 - Keep Yellow and Green as the primary fact sources; Taxi Zone Lookup is only for enrichment.
 - For the current MVP, keep `gold_daily_kpis` and `gold_zone_demand` as curated
   serving marts.

@@ -1,6 +1,6 @@
 # Release Checklist
 
-Verification date: `2026-04-28`
+Verification date: `2026-05-03`
 
 Use this checklist before a thesis defense, final submission, or handoff. It is
 designed for the current local-first MVP, not for production cloud deployment.
@@ -96,6 +96,7 @@ docker compose exec airflow-scheduler python -c "import sys; sys.path.insert(0, 
 | Python/unit changes | `python -m pytest -p no:cacheprovider` |
 | Ingestion changes | `python -m pytest -p no:cacheprovider tests/test_tlc_ingestion.py`; review MinIO object paths |
 | dbt model or schema changes | dbt build through `airflow-scheduler`; review warning-only anomaly tests |
+| Pipeline metadata changes | `python -m pytest -p no:cacheprovider tests/test_pipeline_metadata.py tests/test_dbt_runner.py tests/test_tlc_ingestion.py`; confirm MinIO `metadata/pipeline_runs/...` after Docker/Airflow run |
 | Semantic catalog changes | `python -m pytest -p no:cacheprovider tests/test_semantic_catalog.py`; API schema smoke check |
 | Gold model exposure changes | `python scripts/release_check.py`; confirm every `dbt/models/gold/*.sql` model has one matching `contracts/semantic_catalog.yaml` table and vice versa |
 | SQL guardrail changes | SQL guardrail tests; Docker API blocked-query smoke checks |
@@ -103,6 +104,37 @@ docker compose exec airflow-scheduler python -c "import sys; sys.path.insert(0, 
 | Demo changes | Streamlit HTTP `200`; official demo scenario spot checks |
 | Docs-only changes | `python scripts/release_check.py`; terminology consistency review |
 | Final release | All standard verification checks plus official demo scenarios |
+
+## Post-Thesis Extension Gate
+
+The Phase 20 thesis MVP and Phase 21 handoff tag remain the stable baseline.
+Before implementing post-thesis work, confirm `docs/development-roadmap.md`
+records exactly one selected extension direction.
+
+Phase 24 selected extension direction:
+
+- Agent extension: improve deterministic planner and evaluation coverage while
+  preserving read-only, Gold-only, framework-light behavior.
+
+Current active next phase:
+
+- Pipeline Reality Hardening: close operational gaps in ingestion metadata,
+  idempotency, source completeness, dbt run evidence, quality gates, and
+  recovery while keeping the Yellow/Green local-first MVP scope.
+
+Phase 25 pipeline evidence should include:
+
+- atomic local downloads before Bronze upload
+- checksum and file-size metadata on new Bronze objects
+- explicit statuses for verified/unverified existing objects
+- explicit statuses for recent publication lag versus historical missing source
+- dbt `run_results.json` summaries in pipeline metadata
+- MinIO JSON metadata under `metadata/pipeline_runs/taxi_monthly_pipeline/...`
+- release check confirming generated `dbt/target` artifacts are not tracked
+
+Do not mix this with public deployment hardening, performance materialization,
+or new data-source work in the same phase. Any API agent change still needs
+tests plus API smoke checks for success, clarification, and blocked SQL.
 
 ## Security Review
 

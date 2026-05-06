@@ -118,9 +118,9 @@ Phase 24 selected extension direction:
 
 Current active next phase:
 
-- Pipeline Reality Hardening: close operational gaps in ingestion metadata,
-  idempotency, source completeness, dbt run evidence, quality gates, and
-  recovery while keeping the Yellow/Green local-first MVP scope.
+- Phase 30 decision gate: choose exactly one next extension direction after
+  Phase 25-29 pipeline, quality gate, planner, evaluation, and rehearsal work.
+  Default to public demo hardening only if the app must leave localhost.
 
 Phase 25 pipeline evidence should include:
 
@@ -131,6 +131,24 @@ Phase 25 pipeline evidence should include:
 - dbt `run_results.json` summaries in pipeline metadata
 - MinIO JSON metadata under `metadata/pipeline_runs/taxi_monthly_pipeline/...`
 - release check confirming generated `dbt/target` artifacts are not tracked
+
+Phase 25 was verified on `2026-05-06` with Airflow run
+`phase25_2024_01_20260506`. Use this command to validate the local metadata
+copy for that run:
+
+```bash
+python scripts/check_pipeline_run.py --run-id phase25_2024_01_20260506 --local-only
+```
+
+The host may not be able to read MinIO backing `xl.meta` files directly on
+Windows. In that case, verify the MinIO copy through the S3 API from the Airflow
+scheduler container.
+
+Phase 28 agent evaluation can be rerun with:
+
+```bash
+python scripts/agent_eval.py --base-url http://localhost:8000 --window 2024-H1 --output docs/agent-evaluation-results.json
+```
 
 Do not mix this with public deployment hardening, performance materialization,
 or new data-source work in the same phase. Any API agent change still needs

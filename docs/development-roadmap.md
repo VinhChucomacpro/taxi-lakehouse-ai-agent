@@ -1095,7 +1095,7 @@ Next step: Phase 25, Pipeline Reality Hardening.
 
 ## Phase 25: Pipeline Reality Hardening
 
-Status: in progress on 2026-05-03.
+Status: completed on 2026-05-06.
 
 Goal: close the gap between the current local-first MVP pipeline and a more
 realistic operational batch pipeline, without changing the in-scope data sources
@@ -1175,9 +1175,6 @@ Verification target:
 - API smoke checks still pass for valid Gold query, blocked DDL, and blocked
   detailed wildcard query.
 
-Next step after Phase 25: revisit Agent Planner And Evaluation Coverage only
-after pipeline run evidence is durable and repeatable.
-
 Progress on 2026-05-03:
 
 - Added `airflow/dags/lib/pipeline_metadata.py` for pipeline run summary JSON,
@@ -1205,14 +1202,153 @@ Verification on 2026-05-03:
 - AST parse passed for changed Python files; `py_compile` was not used because
   Windows denied writes to the existing `airflow/dags/__pycache__` directory.
 
-Remaining:
+Final verification on 2026-05-06:
 
-- Run Docker/Airflow manual DAG verification for a known month.
-- Confirm MinIO metadata JSON exists under
-  `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
-- Confirm metadata contains ingestion statuses, checksums, dbt counts, and
-  quality gate status.
-- Run API smoke checks after the Airflow run.
+- `docker compose up -d` started the existing stack.
+- Airflow DAG run `phase25_2024_01_20260506` with config
+  `{year: 2024, month: 1}` completed successfully.
+- Task states confirmed `build_silver_layer`, `build_gold_layer`, and
+  `publish_metadata` all succeeded.
+- `python scripts/check_pipeline_run.py --run-id phase25_2024_01_20260506
+  --local-only` passed.
+- MinIO S3 API confirmed metadata object
+  `metadata/pipeline_runs/taxi_monthly_pipeline/2026-03-15/phase25_2024_01_20260506.json`
+  exists with run mode `manual`, target month `2024-01`, quality gate
+  `passed_with_warnings`, and dbt counts `pass=77`, `warn=2`, `error=0`,
+  `skip=0`.
+- Ingestion results were classified as `skipped_existing_unverified` for the
+  existing Yellow, Green, and Taxi Zone Lookup objects. They include source URL,
+  Bronze object key, and file size; checksum is absent because these were
+  pre-Phase 25 Bronze objects.
+- API smoke checks passed for valid Gold query, blocked DDL, and blocked
+  detailed fact wildcard query.
+
+Next step: Phase 26, Operational Quality Gates And Recovery.
+
+## Phase 26: Operational Quality Gates And Recovery
+
+Status: completed on 2026-05-06.
+
+Goal: make pipeline metadata and warning handling easier to verify after
+Airflow runs.
+
+Completed:
+
+- Added `scripts/check_pipeline_run.py` to validate local pipeline metadata and,
+  when readable from the host, the MinIO-backed metadata copy.
+- The checker validates required top-level fields, run id, run mode, target
+  months, ingestion result fields, dbt count fields, and quality gate status.
+- Documented the warning policy: `passed_with_warnings` can pass demo/rehearsal
+  when warnings are the known source-data anomaly tests, while blocking
+  ingestion failures or dbt errors require investigation.
+- Kept recovery conservative: manual `{year, month}` remains the backfill path,
+  existing Bronze objects are not overwritten by default, and no `force_reingest`
+  workflow was added.
+
+Verification:
+
+- `python -m pytest -p no:cacheprovider` passed with `44 passed, 2 skipped`.
+- `python scripts/check_pipeline_run.py --run-id phase25_2024_01_20260506
+  --local-only` passed.
+- MinIO object validation was completed through the S3 API from the Airflow
+  scheduler container because the Windows host could not directly read MinIO
+  backing `xl.meta` files.
+
+Next step: Phase 27, Agent Planner Coverage Expansion.
+
+## Phase 27: Agent Planner Coverage Expansion
+
+Status: completed on 2026-05-06.
+
+Goal: widen deterministic planner coverage for common post-thesis questions
+without changing the API contract or adding an agent framework.
+
+Completed:
+
+- Added deterministic routes for monthly service average distance, monthly
+  service total fare, monthly service total amount, vendor monthly trend, and
+  pickup/dropoff borough comparison.
+- Preserved routing policy: `gold_daily_kpis` for common service KPI trends,
+  `gold_zone_demand` for pickup demand, and `fact_trips` plus dimensions for
+  total amount, vendor, payment, and dropoff-role analysis.
+- Kept `/api/v1/query` response fields unchanged.
+- Lazy-loaded DuckDB and sqlglot-dependent modules in `services/api/app/agent.py`
+  so planner-only tests can run on the host without API runtime dependencies.
+
+Verification:
+
+- Planner tests confirm expected intent, selected surface, selected tables,
+  `2024-H1` date filters, and guardrail-safe joins.
+- `python -m pytest -p no:cacheprovider tests/test_semantic_catalog.py
+  tests/test_operational_scripts.py` passed with `15 passed`.
+- Full host test suite passed with `44 passed, 2 skipped`.
+
+Next step: Phase 28, Agent Evaluation Regression Harness.
+
+## Phase 28: Agent Evaluation Regression Harness
+
+Status: completed on 2026-05-06.
+
+Goal: turn agent evaluation into a repeatable API regression check instead of
+only a static report.
+
+Completed:
+
+- Added `scripts/agent_eval.py --base-url http://localhost:8000 --window
+  2024-H1`.
+- The harness covers successful deterministic planner cases, clarification, DDL
+  rejection, detailed wildcard rejection, selected query surface, selected
+  tables, SQL contents, HTTP status, and row count.
+- Added `docs/agent-evaluation-results.json` with the latest run output.
+- Refreshed `docs/agent-evaluation.md` to point at the executable harness.
+
+Verification:
+
+- `python scripts/agent_eval.py --base-url http://localhost:8000 --window
+  2024-H1 --output docs/agent-evaluation-results.json` passed `11/11` cases.
+- API smoke checks still passed for valid Gold query, blocked DDL, and blocked
+  detailed fact wildcard query.
+
+Next step: Phase 29, Demo And Release Rehearsal Refresh.
+
+## Phase 29: Demo And Release Rehearsal Refresh
+
+Status: completed on 2026-05-06.
+
+Goal: refresh release/demo evidence after the pipeline and planner changes.
+
+Completed:
+
+- Verified API `/healthz`, Streamlit, and Airflow health endpoints returned
+  HTTP `200`.
+- Re-ran API release smoke checks for valid Gold query, blocked DDL, and blocked
+  detailed wildcard access.
+- Updated demo and release documentation with the new planner/evaluation
+  evidence.
+- Kept Ask AI history as session-local display only; no multi-turn memory or API
+  contract change was added.
+
+Verification:
+
+- API, Streamlit, and Airflow health checks returned HTTP `200`.
+- `python -m pytest -p no:cacheprovider` passed with `44 passed, 2 skipped`.
+- `python scripts/release_check.py` passed after docs were refreshed.
+
+Next step: Phase 30, Next Extension Decision Gate.
+
+## Phase 30: Next Extension Decision Gate
+
+Status: planned.
+
+Goal: choose exactly one direction after the pipeline and agent coverage work is
+stable.
+
+Default recommendation:
+
+- Keep the project local-first unless the app must leave localhost.
+- Choose public demo hardening only when external access is required.
+- Keep performance/materialization and data-scope expansion deferred until a
+  separate decision phase provides concrete evidence.
 
 ## Documentation And Handoff Rule
 

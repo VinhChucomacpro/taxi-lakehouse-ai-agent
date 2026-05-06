@@ -1,0 +1,161 @@
+{
+  "evaluation": "agent_regression",
+  "base_url": "http://localhost:8000",
+  "window": "2024-H1",
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "results": [
+    {
+      "case_id": "A01",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "aggregate_mart",
+      "selected_tables": [
+        "gold_daily_kpis"
+      ],
+      "row_count": 12,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 530
+    },
+    {
+      "case_id": "A02",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "aggregate_mart",
+      "selected_tables": [
+        "gold_daily_kpis"
+      ],
+      "row_count": 12,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 588
+    },
+    {
+      "case_id": "A03",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "aggregate_mart",
+      "selected_tables": [
+        "gold_daily_kpis"
+      ],
+      "row_count": 12,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 556
+    },
+    {
+      "case_id": "A04",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "star_schema",
+      "selected_tables": [
+        "fact_trips"
+      ],
+      "row_count": 12,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 631
+    },
+    {
+      "case_id": "A05",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "star_schema",
+      "selected_tables": [
+        "fact_trips",
+        "dim_vendor"
+      ],
+      "row_count": 17,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 934
+    },
+    {
+      "case_id": "A06",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "star_schema",
+      "selected_tables": [
+        "fact_trips",
+        "dim_payment_type"
+      ],
+      "row_count": 6,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 3566
+    },
+    {
+      "case_id": "A07",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "aggregate_mart",
+      "selected_tables": [
+        "gold_zone_demand"
+      ],
+      "row_count": 8,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 1184
+    },
+    {
+      "case_id": "A08",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": "star_schema",
+      "selected_tables": [
+        "fact_trips",
+        "dim_zone"
+      ],
+      "row_count": 50,
+      "requires_clarification": false,
+      "detail": null,
+      "elapsed_ms": 1007
+    },
+    {
+      "case_id": "C01",
+      "status": "pass",
+      "http_status": 200,
+      "failures": [],
+      "surface": null,
+      "selected_tables": null,
+      "row_count": 0,
+      "requires_clarification": true,
+      "detail": null,
+      "elapsed_ms": 77
+    },
+    {
+      "case_id": "B01",
+      "status": "pass",
+      "http_status": 400,
+      "failures": [],
+      "surface": null,
+      "selected_tables": null,
+      "row_count": 0,
+      "requires_clarification": null,
+      "detail": "Only SELECT queries are allowed.",
+      "elapsed_ms": 90
+    },
+    {
+      "case_id": "B02",
+      "status": "pass",
+      "http_status": 400,
+      "failures": [],
+      "surface": null,
+      "selected_tables": null,
+      "row_count": 0,
+      "requires_clarification": null,
+      "detail": "Wildcard SELECT is not allowed for detailed Gold tables: fact_trips.",
+      "elapsed_ms": 112
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Demo Scenario Pack
 
-Last verified: `2026-05-02`
+Last verified: `2026-05-06`
 
 Defense dataset window: `2024-01-01` through `2024-06-30`
 
@@ -41,6 +41,8 @@ continuity; this is not multi-turn agent memory and is not sent to the API.
 | `D11` | Guardrails | `Fact wildcard` blocked query | Rejection | Detailed Gold wildcard access is blocked |
 | `D12` | Ask AI | Run two prompts, then clear history | Session-local UI history | Previous Ask AI results display newest-first; clearing history does not call the API |
 | `D13` | Any successful result | Enable `Show chart`, then `Export CSV` | Result UX | Human-reviewed chart rendering and reproducible export |
+| `D14` | Ask AI | `Average trip distance by service type by month in 2024 H1` | `gold_daily_kpis` | New deterministic service KPI planner coverage |
+| `D15` | Ask AI | `Compare pickup and dropoff borough demand in 2024 H1` | `fact_trips` + two `dim_zone` roles | Controlled pickup/dropoff role comparison |
 
 ## Scenario Notes
 
@@ -58,6 +60,9 @@ continuity; this is not multi-turn agent memory and is not sent to the API.
   agent into a multi-turn chat system.
 - `D13` should be run after a successful table result so charting and export are
   visible without hiding the underlying rows.
+- `D14` and `D15` are post-Phase 27 planner regression scenarios. They are
+  useful spot checks after code changes, but the core 10-15 minute defense flow
+  can still use `D01` through `D13`.
 
 ## Expected Evidence
 

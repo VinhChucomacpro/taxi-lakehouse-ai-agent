@@ -6,6 +6,7 @@ import yaml
 sys.path.insert(0, str(Path("services/api")))
 
 from app.catalog import load_schema_catalog  # noqa: E402
+from app.agent import build_query_plan, deterministic_sql_for_plan, normalize_question  # noqa: E402
 from app.text_to_sql import generate_sql_with_openai, render_catalog_for_prompt  # noqa: E402
 
 
@@ -135,3 +136,74 @@ def test_vietnamese_h1_demo_prompt_uses_daily_kpi_mart() -> None:
     assert "JOIN" not in sql.upper()
     assert "2024-01-01" in sql
     assert "2024-07-01" in sql
+
+
+def test_planner_generates_monthly_service_distance_from_daily_kpis() -> None:
+    catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
+    question = "Average trip distance by service type by month in 2024 H1"
+    normalized = normalize_question(question)
+
+    plan = build_query_plan(normalized, catalog)
+    sql = deterministic_sql_for_plan(question, plan, catalog)
+
+    assert plan.intent == "monthly_service_kpi"
+    assert plan.surface == "aggregate_mart"
+    assert plan.selected_tables == ["gold_daily_kpis"]
+    assert sql is not None
+    assert "FROM gold_daily_kpis" in sql
+    assert "avg_trip_distance" in sql
+    assert "2024-01-01" in sql
+    assert "2024-07-01" in sql
+
+
+def test_planner_generates_monthly_service_total_amount_from_fact() -> None:
+    catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
+    question = "Total amount by service type by month in 2024 H1"
+    normalized = normalize_question(question)
+
+    plan = build_query_plan(normalized, catalog)
+    sql = deterministic_sql_for_plan(question, plan, catalog)
+
+    assert plan.intent == "monthly_service_total_amount"
+    assert plan.surface == "star_schema"
+    assert plan.selected_tables == ["fact_trips"]
+    assert sql is not None
+    assert "FROM fact_trips" in sql
+    assert "SUM(total_amount) AS total_amount" in sql
+    assert "2024-01-01" in sql
+    assert "2024-07-01" in sql
+
+
+def test_planner_generates_vendor_monthly_trend_with_allowed_joins() -> None:
+    catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
+    question = "Vendor trend by month in 2024 H1"
+    normalized = normalize_question(question)
+
+    plan = build_query_plan(normalized, catalog)
+    sql = deterministic_sql_for_plan(question, plan, catalog)
+
+    assert plan.intent == "vendor_analysis"
+    assert plan.surface == "star_schema"
+    assert plan.selected_tables == ["fact_trips", "dim_vendor"]
+    assert sql is not None
+    assert "JOIN dim_vendor AS v ON f.vendor_id = v.vendor_id" in sql
+    assert "JOIN dim_date AS d ON f.pickup_date = d.pickup_date" in sql
+    assert "d.year_month" in sql
+
+
+def test_planner_generates_pickup_dropoff_borough_comparison() -> None:
+    catalog = load_schema_catalog(Path("contracts/semantic_catalog.yaml"))
+    question = "Compare pickup and dropoff borough demand in 2024 H1"
+    normalized = normalize_question(question)
+
+    plan = build_query_plan(normalized, catalog)
+    sql = deterministic_sql_for_plan(question, plan, catalog)
+
+    assert plan.intent == "pickup_dropoff_borough_comparison"
+    assert plan.surface == "star_schema"
+    assert plan.selected_tables == ["fact_trips", "dim_zone"]
+    assert sql is not None
+    assert "f.pickup_zone_id = pickup_zone.zone_id" in sql
+    assert "f.dropoff_zone_id = dropoff_zone.zone_id" in sql
+    assert "pickup_borough" in sql
+    assert "dropoff_borough" in sql

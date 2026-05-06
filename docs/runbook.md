@@ -813,13 +813,89 @@ Phase 25 local verification:
 - AST parse passed for changed Python files after `py_compile` could not write
   into the existing Windows `airflow/dags/__pycache__` directory.
 
-Remaining Phase 25 verification:
+Completed Phase 25 Docker/Airflow verification:
 
-- Run a Docker/Airflow manual DAG for a known month.
-- Confirm MinIO contains `metadata/pipeline_runs/taxi_monthly_pipeline/...`.
-- Confirm the metadata JSON includes ingestion statuses, checksums, dbt counts,
-  and quality gate status.
-- Confirm API smoke checks still pass after the run.
+- Verification date: `2026-05-06`.
+- `docker compose up -d` started the existing stack.
+- Airflow DAG run `phase25_2024_01_20260506` was triggered for manual config
+  `{year: 2024, month: 1}` and completed with state `success`.
+- Task states showed `build_silver_layer`, `build_gold_layer`, and
+  `publish_metadata` succeeded.
+- Local metadata validation passed:
+
+  ```bash
+  python scripts/check_pipeline_run.py --run-id phase25_2024_01_20260506 --local-only
+  ```
+
+- The validated local metadata path was
+  `data/metadata/pipeline_runs/taxi_monthly_pipeline/2026-03-15/phase25_2024_01_20260506.json`.
+- MinIO S3 API confirmed the metadata object exists at
+  `metadata/pipeline_runs/taxi_monthly_pipeline/2026-03-15/phase25_2024_01_20260506.json`.
+- Metadata contents confirmed:
+  - `run_id`: `phase25_2024_01_20260506`
+  - `run_mode`: `manual`
+  - `target_months`: `["2024-01"]`
+  - `quality_gate.status`: `passed_with_warnings`
+  - dbt counts: `pass=77`, `warn=2`, `error=0`, `skip=0`
+  - ingestion statuses: `skipped_existing_unverified` for Yellow, Green, and
+    Taxi Zone Lookup
+- The existing Bronze objects include source URL, object key, and file size in
+  metadata. They do not include checksum because they were created before Phase
+  25 checksum metadata was introduced.
+- Windows host inspection of the raw MinIO backing file hit a permission issue
+  on `xl.meta`, so MinIO object verification was performed through the S3 API
+  from the Airflow scheduler container.
+- API smoke checks after the run:
+  - valid `gold_daily_kpis` query returned HTTP `200`
+  - `drop table gold_daily_kpis` returned HTTP `400`
+  - `select * from fact_trips` returned HTTP `400`
+
+## Last Verified Phase 26-29 Extension State
+
+Last verification: `2026-05-06`.
+
+Phase 26 operational quality gates:
+
+- Added `scripts/check_pipeline_run.py` for pipeline metadata validation.
+- The checker validates required run identity, target months, ingestion result
+  fields, dbt pass/warn/error/skip counts, and quality gate status.
+- Warning policy: `passed_with_warnings` can pass demo rehearsal when warnings
+  are known source-data anomaly tests. Blocking ingestion statuses or any dbt
+  error require investigation before handoff.
+- Recovery policy remains conservative: use manual `{year, month}` backfill,
+  do not overwrite existing Bronze objects by default, and do not add
+  `force_reingest` until a separate controlled overwrite phase exists.
+
+Phase 27 planner coverage:
+
+- Deterministic planner now covers monthly service average distance, monthly
+  service fare, monthly service total amount, vendor monthly trend, payment
+  split, pickup demand, dropoff demand, and pickup/dropoff borough comparison.
+- Routing remains Gold-only and read-only:
+  - `gold_daily_kpis` for monthly service KPI trends
+  - `gold_zone_demand` for pickup zone/borough demand
+  - `fact_trips` plus dimensions for vendor, payment, total amount, and
+    dropoff-role analysis
+
+Phase 28 agent evaluation harness:
+
+- New command:
+
+  ```bash
+  python scripts/agent_eval.py --base-url http://localhost:8000 --window 2024-H1 --output docs/agent-evaluation-results.json
+  ```
+
+- Latest run passed `11/11` cases.
+- Cases cover bilingual H1 prompt handling, service KPI trends, vendor trend,
+  payment split, pickup/dropoff geography, clarification, DDL rejection, and
+  detailed wildcard rejection.
+
+Phase 29 rehearsal refresh:
+
+- API `/healthz`, Streamlit, and Airflow health endpoints returned HTTP `200`.
+- Release API smoke checks passed for valid Gold query, blocked DDL, and blocked
+  detailed fact wildcard query.
+- Ask AI history remains session-local display only and is not sent to the API.
 
 ## Last Verified Ask AI History Display
 

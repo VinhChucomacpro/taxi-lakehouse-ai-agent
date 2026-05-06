@@ -188,6 +188,13 @@ python -m pytest -p no:cacheprovider
 python scripts/release_check.py
 ```
 
+Operational/evaluation checks after the Docker stack is running:
+
+```bash
+python scripts/check_pipeline_run.py --run-id phase25_2024_01_20260506 --local-only
+python scripts/agent_eval.py --base-url http://localhost:8000 --window 2024-H1 --output docs/agent-evaluation-results.json
+```
+
 dbt build through the Airflow scheduler container:
 
 ```bash

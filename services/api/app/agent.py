@@ -9,8 +9,6 @@ from typing import Any
 from openai import OpenAI
 
 from app.models import AgentStep, QueryRequest, QueryResponse, SchemaResponse, SchemaTable
-from app.query_engine import QueryExecutionError, execute_readonly_query
-from app.sql_guardrails import SQLValidationError, validate_gold_select
 from app.text_to_sql import (
     SQLGenerationError,
     generate_common_mart_sql,
@@ -110,12 +108,16 @@ def run_query_agent(
 
     candidate_sql = generate_candidate_sql(context)
     validated = validate_candidate_sql(context, candidate_sql)
+    from app.query_engine import QueryExecutionError
+
     try:
         columns, rows, execution_ms = execute_candidate_sql(context, validated.sql)
     except QueryExecutionError as exc:
         if context.request.sql or not has_openai_key(context.api_key):
             raise
         repaired_sql = repair_sql_once(context, validated.sql, str(exc))
+        from app.sql_guardrails import validate_gold_select
+
         validated = validate_gold_select(repaired_sql, context.catalog, context.request.max_rows)
         context.add_step(
             "guardrail_validation",
@@ -183,6 +185,8 @@ def generate_candidate_sql(context: AgentContext) -> str:
 
 
 def validate_candidate_sql(context: AgentContext, candidate_sql: str):
+    from app.sql_guardrails import SQLValidationError, validate_gold_select
+
     try:
         validated = validate_gold_select(candidate_sql, context.catalog, context.request.max_rows)
         context.add_step(
@@ -213,6 +217,8 @@ def validate_candidate_sql(context: AgentContext, candidate_sql: str):
 
 
 def execute_candidate_sql(context: AgentContext, sql: str) -> tuple[list[str], list[dict[str, Any]], int]:
+    from app.query_engine import execute_readonly_query
+
     try:
         columns, rows, execution_ms = execute_readonly_query(sql, context.duckdb_path)
         context.add_step(
@@ -366,6 +372,8 @@ def deterministic_answer(context: AgentContext, columns: list[str], rows: list[d
 
 
 def repair_sql_once(context: AgentContext, bad_sql: str, error: str) -> str:
+    from app.sql_guardrails import SQLValidationError
+
     if not has_openai_key(context.api_key):
         raise SQLValidationError(error)
 
@@ -424,11 +432,13 @@ def deterministic_sql_for_plan(
     normalized = normalize_question(question)
     year = extract_year(normalized)
     date_filter = date_filter_for_question(normalized, year)
+    metric = metric_for_question(normalized)
+    month_expr = "strftime(pickup_date, '%Y-%m')"
     if plan.intent == "monthly_trip_trend":
         where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
         return (
             "SELECT\n"
-            "  d.month,\n"
+            "  d.year_month,\n"
             "  SUM(f.trip_distance) AS total_trip_distance,\n"
             "  COUNT(*) AS trip_count,\n"
             "  SUM(f.fare_amount) AS total_fare_amount,\n"
@@ -436,8 +446,40 @@ def deterministic_sql_for_plan(
             "FROM fact_trips AS f\n"
             "JOIN dim_date AS d ON f.pickup_date = d.pickup_date"
             f"{where_clause}\n"
-            "GROUP BY d.month\n"
-            "ORDER BY d.month"
+            "GROUP BY d.year_month\n"
+            "ORDER BY d.year_month"
+        )
+
+    if plan.intent == "monthly_service_kpi":
+        where_clause = f"\nWHERE {date_filter}" if date_filter else ""
+        metric_sql = "SUM(trip_count) AS trip_count"
+        if metric == "avg_trip_distance":
+            metric_sql = "AVG(avg_trip_distance) AS avg_trip_distance"
+        elif metric == "total_fare_amount":
+            metric_sql = "SUM(total_fare_amount) AS total_fare_amount"
+        return (
+            "SELECT\n"
+            f"  {month_expr} AS month,\n"
+            "  service_type,\n"
+            f"  {metric_sql}\n"
+            "FROM gold_daily_kpis"
+            f"{where_clause}\n"
+            "GROUP BY 1, 2\n"
+            "ORDER BY 1, 2"
+        )
+
+    if plan.intent == "monthly_service_total_amount":
+        where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'pickup_date')}" if date_filter else ""
+        return (
+            "SELECT\n"
+            "  strftime(pickup_date, '%Y-%m') AS month,\n"
+            "  service_type,\n"
+            "  SUM(total_amount) AS total_amount,\n"
+            "  COUNT(*) AS trip_count\n"
+            "FROM fact_trips"
+            f"{where_clause}\n"
+            "GROUP BY 1, 2\n"
+            "ORDER BY 1, 2"
         )
 
     if plan.intent == "zone_demand":
@@ -483,6 +525,20 @@ def deterministic_sql_for_plan(
 
     if plan.intent == "vendor_analysis":
         where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
+        if has_monthly_intent(normalized) or has_trend_intent(normalized):
+            return (
+                "SELECT\n"
+                "  d.year_month,\n"
+                "  v.vendor_name,\n"
+                "  COUNT(*) AS trip_count,\n"
+                "  SUM(f.total_amount) AS total_amount\n"
+                "FROM fact_trips AS f\n"
+                "JOIN dim_vendor AS v ON f.vendor_id = v.vendor_id\n"
+                "JOIN dim_date AS d ON f.pickup_date = d.pickup_date"
+                f"{where_clause}\n"
+                "GROUP BY d.year_month, v.vendor_name\n"
+                "ORDER BY d.year_month, trip_count DESC"
+            )
         return (
             "SELECT\n"
             "  v.vendor_name,\n"
@@ -509,11 +565,53 @@ def deterministic_sql_for_plan(
             "ORDER BY trip_count DESC"
         )
 
+    if plan.intent == "pickup_dropoff_borough_comparison":
+        where_clause = f"\nWHERE {date_filter.replace('pickup_date', 'f.pickup_date')}" if date_filter else ""
+        return (
+            "SELECT\n"
+            "  pickup_zone.borough AS pickup_borough,\n"
+            "  dropoff_zone.borough AS dropoff_borough,\n"
+            "  COUNT(*) AS trip_count,\n"
+            "  SUM(f.total_amount) AS total_amount\n"
+            "FROM fact_trips AS f\n"
+            "JOIN dim_zone AS pickup_zone ON f.pickup_zone_id = pickup_zone.zone_id\n"
+            "JOIN dim_zone AS dropoff_zone ON f.dropoff_zone_id = dropoff_zone.zone_id\n"
+            f"{where_clause}\n"
+            "GROUP BY pickup_zone.borough, dropoff_zone.borough\n"
+            "ORDER BY trip_count DESC"
+        )
+
     return None
 
 
 def build_query_plan(question: str, catalog: SchemaResponse) -> QueryPlan:
+    if has_pickup_intent(question) and has_dropoff_intent(question) and has_geography_intent(question):
+        return QueryPlan(
+            intent="pickup_dropoff_borough_comparison",
+            surface="star_schema",
+            selected_tables=["fact_trips", "dim_zone"],
+            reason="Pickup versus dropoff geography requires fact_trips joined to dim_zone in both roles.",
+            expected_groupings=["pickup_borough", "dropoff_borough"],
+        )
+
     if has_monthly_intent(question) and has_service_intent(question):
+        metric = metric_for_question(question)
+        if metric == "total_amount":
+            return QueryPlan(
+                intent="monthly_service_total_amount",
+                surface="star_schema",
+                selected_tables=["fact_trips"],
+                reason="Monthly service total amount needs total_amount from the fact table.",
+                expected_groupings=["month", "service_type"],
+            )
+        if metric in {"avg_trip_distance", "total_fare_amount"}:
+            return QueryPlan(
+                intent="monthly_service_kpi",
+                surface="aggregate_mart",
+                selected_tables=["gold_daily_kpis"],
+                reason="Monthly service KPI trend can use the denormalized daily KPI mart.",
+                expected_groupings=["month", "service_type"],
+            )
         return QueryPlan(
             intent="monthly_service_comparison",
             surface="aggregate_mart",
@@ -673,6 +771,24 @@ def has_vendor_intent(question: str) -> bool:
 
 def has_payment_intent(question: str) -> bool:
     return any(token in question for token in ("payment", "cash", "card", "thanh toan"))
+
+
+def has_trend_intent(question: str) -> bool:
+    return any(token in question for token in ("trend", "over time", "by month", "theo thang"))
+
+
+def has_geography_intent(question: str) -> bool:
+    return has_zone_intent(question) or has_borough_intent(question)
+
+
+def metric_for_question(question: str) -> str:
+    if any(token in question for token in ("average distance", "avg distance", "avg trip distance", "trip distance", "khoang cach")):
+        return "avg_trip_distance"
+    if any(token in question for token in ("total fare", "fare amount", "fare", "cuoc")):
+        return "total_fare_amount"
+    if any(token in question for token in ("total amount", "revenue", "doanh thu", "tong tien")):
+        return "total_amount"
+    return "trip_count"
 
 
 def extract_year(question: str) -> int | None:

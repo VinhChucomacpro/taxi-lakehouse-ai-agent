@@ -1,12 +1,41 @@
 # Agent Evaluation And Guardrail Benchmark
 
-Last verified: `2026-04-26`
+Last verified: `2026-05-06`
 
 Defense dataset window: `2024-01-01` through `2024-06-30`
 
 This evaluation checks the read-only AI query agent as an engineering component:
 intent/planning, SQL validation, execution, clarification, deterministic answer
 grounding, and guardrail rejection.
+
+The current regression harness is executable:
+
+```bash
+python scripts/agent_eval.py --base-url http://localhost:8000 --window 2024-H1 --output docs/agent-evaluation-results.json
+```
+
+The latest machine-readable result is stored in
+`docs/agent-evaluation-results.json`.
+
+## Latest Regression Harness
+
+Runtime API regression on `2026-05-06`:
+
+- Total cases: `11`
+- Passed expected behavior: `11`
+- Failed expected behavior: `0`
+- Successful answer cases: `8`
+- Clarification cases: `1`
+- Blocked unsafe/invalid SQL cases: `2`
+
+Additional planner coverage in this harness:
+
+- Vietnamese `nửa đầu năm 2024` monthly Yellow/Green comparison.
+- Average trip distance by service and month.
+- Total fare by service and month.
+- Total amount by service and month.
+- Vendor monthly trend through `fact_trips`, `dim_vendor`, and `dim_date`.
+- Pickup/dropoff borough comparison through two `dim_zone` roles.
 
 ## Runtime Summary
 
